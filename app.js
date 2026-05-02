@@ -97,7 +97,7 @@ function goScreen(name, btn) {
   document.querySelectorAll('.nav-pill').forEach(b => b.classList.remove('active'));
   el('sc-' + name).classList.add('active');
   btn.classList.add('active');
-  const renders = { inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, tips: renderTips };
+  const renders = { inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, ia: renderIA, tips: renderTips };
   renders[name] && renders[name]();
 }
 
@@ -740,13 +740,311 @@ function saveComConfig() {
   renderComisiones(); renderStats();
 }
 
+/* ── ASISTENTE IA (Groq - gratis) ────────────────── */
+const GROQ_KEY_NAME = 'ambar_groq_key';
+
+function getGroqKey() {
+  try { return localStorage.getItem(GROQ_KEY_NAME) || ''; } catch(e) { return ''; }
+}
+function setGroqKey(k) {
+  try { localStorage.setItem(GROQ_KEY_NAME, k); } catch(e) {}
+}
+
+async function groqCall(systemPrompt, userPrompt) {
+  const key = getGroqKey();
+  if (!key) throw new Error('NO_KEY');
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+    body: JSON.stringify({
+      model: 'llama3-8b-8192',
+      max_tokens: 600,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'Error de API');
+  }
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
+}
+
+function catalogoResumen() {
+  return S.motos.map(m =>
+    `- ${m.marca} ${m.modelo}: $${Math.round(m.precio/1000)}k, cuota $${Math.round(m.cuota/1000)}k/mes, ${m.cc}, ${m.consumo}km/l, perfil: ${m.perfil}, stock: ${m.stock}, colores: ${(m.colores||[]).join('/')}`
+  ).join('\n');
+}
+
+function renderIA() {
+  const key = getGroqKey();
+  const keyHtml = `
+  <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:14px;margin-bottom:14px">
+    <div style="font-size:12px;font-weight:600;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">API Key de Groq</div>
+    <div style="display:flex;gap:8px">
+      <input id="groq-key-input" type="password" placeholder="gsk_..." value="${key}"
+        style="flex:1;font-size:13px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d);font-family:var(--font)">
+      <button class="btn btn-primary" onclick="guardarGroqKey()" style="flex-shrink:0">Guardar</button>
+    </div>
+    <div style="font-size:10px;color:var(--gray);margin-top:6px">Gratis en <b>console.groq.com</b> → API Keys → Create API Key</div>
+  </div>`;
+
+  const sugerirHtml = `
+  <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px">
+    <div style="background:linear-gradient(135deg,#4C3FD4,#7C6FE8);padding:14px 16px">
+      <div style="font-size:15px;font-weight:600;color:#fff;margin-bottom:2px">Sugerir moto al cliente</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.7)">La IA analiza el perfil y elige la mejor opcion del catalogo</div>
+    </div>
+    <div style="padding:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div class="field" style="margin:0"><label>Presupuesto maximo</label>
+          <select id="ia-presupuesto" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d)">
+            <option value="200000">Hasta $200k</option>
+            <option value="300000">Hasta $300k</option>
+            <option value="400000" selected>Hasta $400k</option>
+            <option value="500000">Hasta $500k</option>
+            <option value="650000">Hasta $650k</option>
+            <option value="9999999">Sin limite</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label>Uso principal</label>
+          <select id="ia-uso" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d)">
+            <option>Trabajo diario</option>
+            <option>Fin de semana</option>
+            <option>Viajes largos</option>
+            <option>Deporte/velocidad</option>
+            <option>Primera moto</option>
+            <option>Economizar combustible</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div class="field" style="margin:0"><label>Tipo de pago</label>
+          <select id="ia-pago" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d)">
+            <option>Contado</option>
+            <option>Financiacion</option>
+            <option>No lo sabe aun</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label>Experiencia</label>
+          <select id="ia-exp" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d)">
+            <option>Primera moto</option>
+            <option>Ya tuvo motos</option>
+            <option>Muy experimentado</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:10px"><label>Notas adicionales (opcional)</label>
+        <input id="ia-notas" placeholder="Ej: tiene pareja, quiere color oscuro, le preocupa el consumo..."
+          style="width:100%;font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d);font-family:var(--font)">
+      </div>
+      <button class="btn btn-primary" style="width:100%;min-height:44px;font-size:14px" onclick="iaSugerirMoto()">
+        Sugerir moto y argumento de cierre
+      </button>
+      <div id="ia-resultado-sugerir" style="margin-top:12px"></div>
+    </div>
+  </div>`;
+
+  const mensajeHtml = `
+  <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px">
+    <div style="background:linear-gradient(135deg,#0E7A5F,#2DBEAA);padding:14px 16px">
+      <div style="font-size:15px;font-weight:600;color:#fff;margin-bottom:2px">Generar mensaje de WhatsApp</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.7)">La IA escribe el mensaje personalizado para cada situacion</div>
+    </div>
+    <div style="padding:14px">
+      <div class="field" style="margin-bottom:10px"><label>Situacion</label>
+        <select id="ia-msg-tipo" style="width:100%;font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d)">
+          <option value="seguimiento">Seguimiento — visito y no compro</option>
+          <option value="postventa">Post-venta — ya compro</option>
+          <option value="promo">Anunciar promo o nuevo modelo</option>
+          <option value="cierre">Intentar cerrar venta</option>
+          <option value="reactivar">Reactivar cliente inactivo</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div class="field" style="margin:0"><label>Nombre del cliente</label>
+          <input id="ia-msg-nombre" placeholder="Sofia" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d);font-family:var(--font)">
+        </div>
+        <div class="field" style="margin:0"><label>Moto de interes</label>
+          <input id="ia-msg-moto" placeholder="Honda CB 190R" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d);font-family:var(--font)">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:10px"><label>Contexto extra (opcional)</label>
+        <input id="ia-msg-contexto" placeholder="Ej: dijo que la semana que viene vuelve, tiene dudas del precio..."
+          style="width:100%;font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d);font-family:var(--font)">
+      </div>
+      <button class="btn btn-teal" style="width:100%;min-height:44px;font-size:14px" onclick="iaGenerarMensaje()">
+        Generar mensaje
+      </button>
+      <div id="ia-resultado-mensaje" style="margin-top:12px"></div>
+    </div>
+  </div>`;
+
+  const cargaHtml = `
+  <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px">
+    <div style="background:linear-gradient(135deg,#C47B0A,#F0A830);padding:14px 16px">
+      <div style="font-size:15px;font-weight:600;color:#fff;margin-bottom:2px">Carga rapida con IA</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.8)">Describis la venta en lenguaje natural y la IA la registra</div>
+    </div>
+    <div style="padding:14px">
+      <div class="field" style="margin-bottom:10px"><label>Describir la venta</label>
+        <textarea id="ia-carga-texto" placeholder="Ej: Le vendi una Honda CB 190R roja a Lucas Fernandez, pago en 12 cuotas, precio 490000, incluyo casco"
+          style="width:100%;min-height:80px;font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d);font-family:var(--font);line-height:1.5;resize:vertical"></textarea>
+      </div>
+      <button class="btn" style="width:100%;min-height:44px;font-size:14px;background:var(--amber-l);color:#633806;border-color:var(--amber-m)" onclick="iaCargaRapida()">
+        Interpretar y pre-cargar formulario
+      </button>
+      <div id="ia-resultado-carga" style="margin-top:12px"></div>
+    </div>
+  </div>`;
+
+  el('ia-content').innerHTML = keyHtml + sugerirHtml + mensajeHtml + cargaHtml;
+}
+
+function guardarGroqKey() {
+  const k = el('groq-key-input').value.trim();
+  if (!k.startsWith('gsk_')) { toast('La clave debe empezar con gsk_'); return; }
+  setGroqKey(k);
+  toast('Clave guardada! Ya podes usar el asistente.');
+}
+
+function iaShowLoading(containerId) {
+  el(containerId).innerHTML = `<div style="text-align:center;padding:20px;color:var(--gray)">
+    <div style="font-size:13px;animation:pulse 1s infinite">Pensando...</div>
+  </div>`;
+}
+
+function iaShowError(containerId, msg) {
+  el(containerId).innerHTML = `<div style="background:var(--red-l);border-radius:10px;padding:12px;font-size:12px;color:var(--red-d)">${msg}</div>`;
+}
+
+async function iaSugerirMoto() {
+  if (!getGroqKey()) { toast('Primero guarda tu API Key de Groq arriba'); return; }
+  if (S.motos.length === 0) { toast('Agrega motos al catalogo primero'); return; }
+
+  iaShowLoading('ia-resultado-sugerir');
+
+  const presupuesto = parseInt(el('ia-presupuesto').value);
+  const uso = el('ia-uso').value;
+  const pago = el('ia-pago').value;
+  const exp = el('ia-exp').value;
+  const notas = el('ia-notas').value;
+
+  const system = `Sos Ambar, vendedora experta de motos en Argentina. Analizas el perfil del cliente y sugeris la mejor moto del catalogo disponible. Respondas en espanol argentino, de forma directa y util para la vendedora. Tu respuesta tiene 3 partes: 1) MOTO RECOMENDADA (nombre y por que), 2) ARGUMENTO DE CIERRE (frase exacta para decirle al cliente), 3) OBJECIONES POSIBLES Y RESPUESTAS (maximo 2). Total maximo 200 palabras.`;
+
+  const user = `CATALOGO DISPONIBLE:\n${catalogoResumen()}\n\nPERFIL DEL CLIENTE:\n- Presupuesto maximo: $${presupuesto.toLocaleString('es-AR')}\n- Uso: ${uso}\n- Pago: ${pago}\n- Experiencia: ${exp}\n${notas ? '- Notas: ' + notas : ''}\n\nSugeri la mejor moto y dame el argumento de cierre exacto.`;
+
+  try {
+    const resp = await groqCall(system, user);
+    el('ia-resultado-sugerir').innerHTML = `
+      <div style="background:var(--purple-l);border-radius:10px;padding:14px;border:1px solid var(--purple-m)">
+        <div style="font-size:11px;font-weight:600;color:var(--purple-d);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Sugerencia de la IA</div>
+        <div style="font-size:13px;color:var(--gray-d);line-height:1.7;white-space:pre-line">${resp}</div>
+      </div>`;
+  } catch(e) {
+    iaShowError('ia-resultado-sugerir', e.message === 'NO_KEY' ? 'Guarda tu API Key primero' : 'Error: ' + e.message);
+  }
+}
+
+async function iaGenerarMensaje() {
+  if (!getGroqKey()) { toast('Primero guarda tu API Key de Groq arriba'); return; }
+
+  iaShowLoading('ia-resultado-mensaje');
+
+  const tipo = el('ia-msg-tipo').value;
+  const nombre = el('ia-msg-nombre').value || 'el/la cliente';
+  const moto = el('ia-msg-moto').value || 'la moto';
+  const contexto = el('ia-msg-contexto').value;
+
+  const tipoDesc = {
+    seguimiento: 'seguimiento a un cliente que visito el local pero no compro',
+    postventa: 'post-venta para un cliente que ya compro la moto',
+    promo: 'anunciar una promocion o nuevo modelo disponible',
+    cierre: 'intentar cerrar la venta con un cliente que esta dudando',
+    reactivar: 'reactivar contacto con un cliente que no responde hace tiempo'
+  };
+
+  const system = `Sos Ambar, vendedora de motos en Argentina. Escribis mensajes de WhatsApp naturales, calidos y efectivos. Mensajes cortos (maximo 5 lineas), en espanol argentino informal, sin emojis exagerados, que suenen a persona real no a bot. Solo respondas con el mensaje, nada mas.`;
+
+  const user = `Escribi un mensaje de WhatsApp de ${tipoDesc[tipo]}.\nNombre del cliente: ${nombre}\nMoto: ${moto}\n${contexto ? 'Contexto: ' + contexto : ''}\nFirma siempre como Ambar de la concesionaria.`;
+
+  try {
+    const resp = await groqCall(system, user);
+    el('ia-resultado-mensaje').innerHTML = `
+      <div style="background:var(--teal-l);border-radius:10px;padding:14px;border:1px solid var(--teal-m)">
+        <div style="font-size:13px;color:#085041;line-height:1.7;white-space:pre-line">${resp}</div>
+        <button class="btn btn-teal" style="margin-top:10px;width:100%" onclick="copiarTexto(\`${resp.replace(/`/g,"'")}\`)">Copiar mensaje</button>
+      </div>`;
+  } catch(e) {
+    iaShowError('ia-resultado-mensaje', e.message === 'NO_KEY' ? 'Guarda tu API Key primero' : 'Error: ' + e.message);
+  }
+}
+
+async function iaCargaRapida() {
+  if (!getGroqKey()) { toast('Primero guarda tu API Key de Groq arriba'); return; }
+  const texto = el('ia-carga-texto').value.trim();
+  if (!texto) { toast('Describe la venta primero'); return; }
+
+  iaShowLoading('ia-resultado-carga');
+
+  const system = `Extraes datos de ventas de motos desde texto en espanol. Respondas SOLO con JSON valido, sin explicaciones, sin markdown. Formato: {"clienteNombre":"","motoMarca":"","motoModelo":"","color":"","precio":0,"pago":"","notas":""}. Si no encontras un dato, deja string vacio o 0.`;
+
+  try {
+    const resp = await groqCall(system, texto);
+    const clean = resp.replace(/```json|```/g,'').trim();
+    const datos = JSON.parse(clean);
+
+    el('ia-resultado-carga').innerHTML = `
+      <div style="background:var(--amber-l);border-radius:10px;padding:14px;border:1px solid var(--amber-m);margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;color:#633806;margin-bottom:8px">Datos detectados:</div>
+        ${Object.entries(datos).filter(([,v])=>v).map(([k,v])=>`<div style="font-size:12px;color:var(--gray-d);padding:3px 0;border-bottom:1px solid rgba(0,0,0,0.05)"><b>${k}:</b> ${v}</div>`).join('')}
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="iaAbrirVentaConDatos(${encodeURIComponent(JSON.stringify(datos))})">Abrir formulario de venta con estos datos</button>`;
+  } catch(e) {
+    iaShowError('ia-resultado-carga', e.message === 'NO_KEY' ? 'Guarda tu API Key primero' : 'No pude interpretar el texto. Intenta ser mas especifico.');
+  }
+}
+
+function iaAbrirVentaConDatos(encodedDatos) {
+  try {
+    const datos = JSON.parse(decodeURIComponent(encodedDatos));
+    openSheet('sh-venta');
+    setTimeout(() => {
+      if (datos.precio) el('vpr').value = datos.precio;
+      if (datos.color) el('vcol').value = datos.color;
+      if (datos.notas) el('vno').value = datos.notas;
+      if (datos.pago) {
+        const p = el('vpago');
+        if (datos.pago.toLowerCase().includes('12')) p.value = 'Cuotas x12';
+        else if (datos.pago.toLowerCase().includes('18')) p.value = 'Cuotas x18';
+        else if (datos.pago.toLowerCase().includes('24')) p.value = 'Cuotas x24';
+        else if (datos.pago.toLowerCase().includes('contado')) p.value = 'Contado';
+      }
+      const moto = S.motos.find(m =>
+        (m.marca + ' ' + m.modelo).toLowerCase().includes((datos.motoModelo||'').toLowerCase()) ||
+        m.modelo.toLowerCase().includes((datos.motoModelo||'').toLowerCase())
+      );
+      if (moto) el('vm').value = moto.id;
+      const cliente = S.clientes.find(c => c.nombre.toLowerCase().includes((datos.clienteNombre||'').toLowerCase()));
+      if (cliente) el('vc').value = cliente.id;
+    }, 150);
+  } catch(e) {}
+}
+
+function copiarTexto(txt) {
+  navigator.clipboard.writeText(txt).then(() => toast('Copiado!')).catch(() => toast('Selecciona el texto manualmente'));
+}
+
 /* ── INIT ────────────────────────────────────────── */
 function renderAll() {
   renderStats();
   const active = document.querySelector('.screen.active');
   if (!active) return;
   const name = active.id.replace('sc-', '');
-  ({ inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, tips: renderTips })[name]?.();
+  ({ inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, ia: renderIA, tips: renderTips })[name]?.();
 }
 
 function setGreeting() {
