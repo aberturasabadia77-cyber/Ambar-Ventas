@@ -97,7 +97,7 @@ function goScreen(name, btn) {
   document.querySelectorAll('.nav-pill').forEach(b => b.classList.remove('active'));
   el('sc-' + name).classList.add('active');
   btn.classList.add('active');
-  const renders = { inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, tips: renderTips };
+  const renders = { inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, tips: renderTips };
   renders[name] && renders[name]();
 }
 
@@ -162,7 +162,7 @@ function contactCard({ nombre, subtipo, meta, nota, sem, btns }) {
 function renderStats() {
   const urgentes = S.clientes.filter(c => semCliente(c).dot).length +
     S.ventas.filter(v => { const s=semVenta(v); return s && s.dot; }).length;
-  const comision = S.ventas.reduce((a, v) => a + v.precio * 0.03, 0);
+  const comision = totalComisionVentas(S.ventas);
   el('stats-row').innerHTML = `
     <div class="stat-item"><div class="stat-num alert">${urgentes}</div><div class="stat-lbl">Alertas</div></div>
     <div class="stat-item"><div class="stat-num">${S.clientes.length}</div><div class="stat-lbl">Prospectos</div></div>
@@ -278,38 +278,183 @@ function renderProspectos() {
   }).join('') || `<div class="empty"><div class="empty-icon">+</div><div class="empty-text">Agrega tu primer prospecto</div></div>`;
 }
 
-/* ── RENDER STOCK ─────────────────────────────────── */
+/* ── CATALOGO ─────────────────────────────────────── */
+let _catFiltro = 'todas';
+
+function catFilter(chip, val) {
+  document.querySelectorAll('#cat-filters .fchip').forEach(c => c.classList.remove('on'));
+  chip.classList.add('on');
+  _catFiltro = val;
+  renderStock();
+}
+
 function renderStock() {
-  el('stock-list').innerHTML = S.motos.map(m => {
+  const q = (el('cat-search') || {}).value || '';
+  let motos = S.motos.filter(m => {
+    const match = !q || (m.marca + ' ' + m.modelo).toLowerCase().includes(q.toLowerCase());
+    if (!match) return false;
+    if (_catFiltro === 'con-stock') return m.stock > 0;
+    if (_catFiltro === 'sin-stock') return m.stock === 0;
+    return true;
+  });
+
+  el('stock-list').innerHTML = motos.map(m => {
     const sc = m.stock === 0 ? 'stock-out' : m.stock <= 2 ? 'stock-low' : 'stock-ok';
     const sl = m.stock === 0 ? 'Sin stock' : m.stock === 1 ? '1 unidad' : m.stock + ' unidades';
     const dots = (m.colores || []).map(c => `<div class="cdot" style="background:${COLORES_HEX[c]||'#999'}" title="${c}"></div>`).join('');
-    const colLabel = (m.colores || []).join(', ');
-    return `<div class="moto-card">
-      <div class="moto-top">
-        <div>
-          <div class="moto-brand">${m.marca}</div>
-          <div class="moto-model">${m.modelo}</div>
+    const colLabel = (m.colores || []).join(' · ');
+
+    const fotoHtml = m.foto
+      ? `<img src="${m.foto}" style="width:100%;height:160px;object-fit:cover;border-radius:10px 10px 0 0;display:block" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+      : '';
+    const placeholderHtml = `<div style="width:100%;height:160px;background:linear-gradient(135deg,#EEEDFE 0%,#E1F5EE 100%);border-radius:10px 10px 0 0;display:${m.foto?'none':'flex'};align-items:center;justify-content:center;flex-direction:column;gap:6px">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9B92E8" stroke-width="1.2"><path d="M12 12m-8 0a8 8 0 1016 0a8 8 0 10-16 0"/><path d="M5 12h2m10 0h2M12 5v2m0 10v2"/><circle cx="12" cy="12" r="3" fill="#EEEDFE" stroke="#9B92E8"/></svg>
+      <span style="font-size:11px;color:#9B92E8;font-weight:500">${m.marca} ${m.modelo}</span>
+    </div>`;
+
+    return `<div class="moto-card" style="padding:0;overflow:hidden;cursor:pointer" onclick="verMotoDetalle(${m.id})">
+      ${fotoHtml}${placeholderHtml}
+      <div style="padding:13px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px">
+          <div>
+            <div class="moto-brand">${m.marca}</div>
+            <div class="moto-model" style="margin:0">${m.modelo}</div>
+          </div>
+          <span class="${sc}">${sl}</span>
         </div>
-        <span class="${sc}">${sl}</span>
-      </div>
-      <div class="moto-price">${pesos(m.precio)}</div>
-      <div class="moto-cuota">Cuota 12 meses: ${pesos(m.cuota)}</div>
-      <div class="moto-specs">
-        <span class="spec-chip">${m.cc}</span>
-        <span class="spec-chip">${m.consumo} km/l</span>
-        <span class="spec-chip">${m.perfil}</span>
-      </div>
-      <div class="cdots">${dots}<span class="cdot-label">${colLabel}</span></div>
-      <div class="stock-row">
-        <span style="font-size:11px;color:var(--gray)">Ajustar stock:</span>
-        <div class="stock-btns">
-          <button class="btn btn-ghost btn-sm" onclick="adjStock(${m.id},-1)">– Uno</button>
-          <button class="btn btn-ghost btn-sm" onclick="adjStock(${m.id},1)">+ Uno</button>
+        <div style="display:flex;gap:8px;align-items:baseline;margin:6px 0 2px">
+          <div class="moto-price">${pesos(m.precio)}</div>
+          <div style="font-size:11px;color:var(--gray)">· Cuota ${pesos(m.cuota)}/mes</div>
+        </div>
+        <div class="moto-specs" style="margin:6px 0">
+          ${m.cc ? `<span class="spec-chip">${m.cc}</span>` : ''}
+          ${m.consumo ? `<span class="spec-chip">${m.consumo} km/l</span>` : ''}
+          ${m.hp ? `<span class="spec-chip">${m.hp} HP</span>` : ''}
+          ${m.peso ? `<span class="spec-chip">${m.peso} kg</span>` : ''}
+          <span class="spec-chip" style="background:var(--purple-l);color:var(--purple-d)">${m.perfil}</span>
+        </div>
+        <div class="cdots">${dots}<span class="cdot-label">${colLabel}</span></div>
+        ${m.desc ? `<div style="font-size:11px;color:var(--gray);margin-top:6px;line-height:1.5;font-style:italic">"${m.desc}"</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <button class="btn btn-ghost btn-sm" style="flex:1" onclick="event.stopPropagation();adjStock(${m.id},-1)">− Stock</button>
+          <button class="btn btn-ghost btn-sm" style="flex:1" onclick="event.stopPropagation();adjStock(${m.id},1)">+ Stock</button>
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();editarMoto(${m.id})">Editar</button>
         </div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') || `<div class="empty"><div class="empty-icon">🏍</div><div class="empty-text">No hay motos en esta categoria</div></div>`;
+}
+
+function verMotoDetalle(id) {
+  const m = getMoto(id);
+  const sc = m.stock === 0 ? 'stock-out' : m.stock <= 2 ? 'stock-low' : 'stock-ok';
+  const sl = m.stock === 0 ? 'Sin stock' : m.stock === 1 ? '1 unidad' : m.stock + ' unidades';
+  const dots = (m.colores||[]).map(c => `<div class="cdot" style="background:${COLORES_HEX[c]||'#999'};width:20px;height:20px" title="${c}"></div>`).join('');
+
+  const specs = [
+    ['Cilindrada', m.cc],['Consumo', m.consumo ? m.consumo+' km/l' : ''],
+    ['Potencia', m.hp ? m.hp+' HP' : ''],['Peso', m.peso ? m.peso+' kg' : ''],
+    ['Precio lista', pesos(m.precio)],['Cuota 12 meses', pesos(m.cuota)],
+    ['Financiacion 18m', m.cuota ? pesos(Math.round(m.precio/18*1.3)) : ''],
+    ['Perfil ideal', m.perfil],['Stock', sl],
+  ].filter(s => s[1]);
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;overflow-y:auto';
+  overlay.innerHTML = `<div style="background:var(--white);min-height:100vh">
+    ${m.foto ? `<img src="${m.foto}" style="width:100%;height:220px;object-fit:cover;display:block">` :
+      `<div style="width:100%;height:220px;background:linear-gradient(135deg,#EEEDFE,#E1F5EE);display:flex;align-items:center;justify-content:center">
+        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#9B92E8" stroke-width="1"><path d="M12 12m-8 0a8 8 0 1016 0a8 8 0 10-16 0"/><circle cx="12" cy="12" r="3" fill="#EEEDFE" stroke="#9B92E8"/></svg>
+      </div>`}
+    <button onclick="this.closest('[style*=fixed]').remove()" style="position:fixed;top:14px;right:14px;background:rgba(0,0,0,0.4);border:none;border-radius:50%;width:36px;height:36px;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:201">✕</button>
+    <div style="padding:18px">
+      <div style="font-size:11px;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.06em">${m.marca}</div>
+      <div style="font-size:24px;font-weight:600;color:var(--gray-d);margin:2px 0 4px">${m.modelo}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <div style="font-size:22px;font-weight:600;color:var(--purple)">${pesos(m.precio)}</div>
+        <span class="${sc}" style="font-size:11px;font-weight:600">${sl}</span>
+      </div>
+      ${m.desc ? `<div style="background:var(--purple-l);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--purple-d);line-height:1.6;margin-bottom:14px;font-style:italic">"${m.desc}"</div>` : ''}
+      <div style="background:var(--white);border-radius:12px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px">
+        ${specs.map((s,i) => `<div style="display:flex;justify-content:space-between;padding:10px 14px;${i>0?'border-top:1px solid var(--border)':''}">
+          <span style="font-size:12px;color:var(--gray)">${s[0]}</span>
+          <span style="font-size:12px;font-weight:600;color:var(--gray-d)">${s[1]}</span>
+        </div>`).join('')}
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Colores disponibles</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${dots}
+          <span style="font-size:12px;color:var(--gray)">${(m.colores||[]).join(', ')}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" style="flex:1" onclick="adjStock(${m.id},-1);this.closest('[style*=fixed]').remove();renderStock()">− Stock</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="adjStock(${m.id},1);this.closest('[style*=fixed]').remove();renderStock()">+ Stock</button>
+        <button class="btn btn-primary" onclick="this.closest('[style*=fixed]').remove();editarMoto(${m.id})">Editar</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+function editarMoto(id) {
+  const m = getMoto(id);
+  el('sh-moto-title').textContent = 'Editar moto';
+  el('moto-edit-id').value = id;
+  el('mm').value = m.marca || '';
+  el('mmo').value = m.modelo || '';
+  el('mpr').value = m.precio || '';
+  el('mcu').value = m.cuota || '';
+  el('mcc').value = m.cc || '';
+  el('mcon').value = m.consumo || '';
+  el('mhp').value = m.hp || '';
+  el('mpeso').value = m.peso || '';
+  el('mcol').value = (m.colores||[]).join(', ');
+  el('mst').value = m.stock || '';
+  el('mperf').value = m.perfil || 'Primerizo/a';
+  el('mdesc').value = m.desc || '';
+  el('foto-url').value = m.foto && m.foto.startsWith('http') ? m.foto : '';
+  if (m.foto) {
+    el('foto-img').src = m.foto;
+    el('foto-img').style.display = 'block';
+    el('foto-placeholder').style.display = 'none';
+  }
+  openSheet('sh-moto');
+}
+
+function resetMotoForm() {
+  el('sh-moto-title').textContent = 'Nueva moto al catalogo';
+  el('moto-edit-id').value = '';
+  el('foto-img').src = '';
+  el('foto-img').style.display = 'none';
+  el('foto-placeholder').style.display = 'block';
+  el('foto-url').value = '';
+  ['mm','mmo','mpr','mcu','mcc','mcon','mhp','mpeso','mcol','mst','mdesc'].forEach(id => { const e = el(id); if(e) e.value=''; });
+}
+
+function handleFotoFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    el('foto-img').src = e.target.result;
+    el('foto-img').style.display = 'block';
+    el('foto-placeholder').style.display = 'none';
+    el('foto-url').value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleFotoUrl(url) {
+  if (!url) {
+    el('foto-img').src = '';
+    el('foto-img').style.display = 'none';
+    el('foto-placeholder').style.display = 'block';
+    return;
+  }
+  el('foto-img').src = url;
+  el('foto-img').style.display = 'block';
+  el('foto-placeholder').style.display = 'none';
 }
 
 /* ── RENDER TIPS ─────────────────────────────────── */
@@ -400,19 +545,36 @@ function saveMoto() {
   const marca = el('mm').value.trim();
   const modelo = el('mmo').value.trim();
   if (!marca || !modelo) { toast('Marca y modelo son obligatorios'); return; }
-  S.motos.push({
-    id: S.nextId++, marca, modelo,
+
+  const fotoEl = el('foto-img');
+  const foto = fotoEl && fotoEl.style.display !== 'none' && fotoEl.src ? fotoEl.src : '';
+  const editId = el('moto-edit-id') ? el('moto-edit-id').value : '';
+
+  const data = {
+    marca, modelo,
     precio: parseInt(el('mpr').value) || 0,
     cuota: parseInt(el('mcu').value) || 0,
     cc: el('mcc').value.trim(),
     consumo: el('mcon').value.trim(),
+    hp: (el('mhp') || {}).value || '',
+    peso: (el('mpeso') || {}).value || '',
     colores: el('mcol').value.split(',').map(s => s.trim()).filter(Boolean),
     stock: parseInt(el('mst').value) || 0,
-    perfil: el('mperf').value
-  });
-  save(); closeSheet('sh-moto');
-  ['mm','mmo','mpr','mcu','mcc','mcon','mcol','mst'].forEach(id => el(id).value = '');
-  toast('Moto agregada al catalogo!');
+    perfil: el('mperf').value,
+    desc: (el('mdesc') || {}).value || '',
+    foto
+  };
+
+  if (editId) {
+    const idx = S.motos.findIndex(m => m.id == editId);
+    if (idx > -1) S.motos[idx] = { ...S.motos[idx], ...data };
+    toast('Moto actualizada!');
+  } else {
+    S.motos.push({ id: S.nextId++, ...data });
+    toast('Moto agregada al catalogo!');
+  }
+
+  save(); closeSheet('sh-moto'); resetMotoForm();
   renderStock(); populateSelects();
 }
 
@@ -439,13 +601,152 @@ function abrirVentaDesde(id) {
   }, 100);
 }
 
+/* ── COMISIONES ──────────────────────────────────── */
+const COM_DEFAULT = { tipo:'porcentaje', pct:3, fijo:15000, notas:'' };
+
+function getComConfig() { return S.comConfig || COM_DEFAULT; }
+
+function calcComision(venta) {
+  const cfg = getComConfig();
+  if (cfg.tipo === 'fijo') return cfg.fijo || 0;
+  return Math.round(venta.precio * (cfg.pct || 3) / 100);
+}
+
+function totalComisionVentas(ventas) { return ventas.reduce((a,v) => a + calcComision(v), 0); }
+
+function ventasMes(mes, anio) {
+  return S.ventas.filter(v => {
+    const d = new Date(v.fecha);
+    return d.getMonth() === mes && d.getFullYear() === anio;
+  });
+}
+
+function renderComisiones() {
+  const cfg = getComConfig();
+  const mesActual = NOW.getMonth();
+  const anioActual = NOW.getFullYear();
+
+  // Ultimos 6 meses
+  const meses = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(anioActual, mesActual - i, 1);
+    const vs = ventasMes(d.getMonth(), d.getFullYear());
+    meses.push({
+      label: d.toLocaleDateString('es-AR', { month:'short', year:'2-digit' }),
+      mes: d.getMonth(), anio: d.getFullYear(),
+      ventas: vs, total: totalComisionVentas(vs), cant: vs.length
+    });
+  }
+
+  const mesHoy = meses[meses.length - 1];
+  const maxBar = Math.max(...meses.map(m => m.total), 1);
+
+  // Config badge
+  const cfgLabel = cfg.tipo === 'porcentaje'
+    ? `${cfg.pct}% del precio de venta`
+    : `${pesos(cfg.fijo)} fijo por moto`;
+
+  let html = `
+  <div style="background:var(--purple);border-radius:14px;padding:16px;margin-bottom:14px;position:relative;overflow:hidden">
+    <div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.06)"></div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.6);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Comision del mes</div>
+    <div style="font-size:32px;font-weight:600;color:#fff;letter-spacing:-1px">${pesos(mesHoy.total)}</div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">${mesHoy.cant} venta${mesHoy.cant !== 1 ? 's' : ''} en ${mesHoy.label}</div>
+    <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:11px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.1);padding:4px 10px;border-radius:20px">${cfgLabel}</span>
+      <button onclick="abrirComConfig()" style="font-size:11px;color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 12px;cursor:pointer">Cambiar</button>
+    </div>
+  </div>
+
+  <div class="section-label">Evolucion mensual</div>
+  <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:16px;margin-bottom:14px">
+    <div style="display:flex;align-items:flex-end;gap:8px;height:100px;margin-bottom:8px">
+      ${meses.map(m => {
+        const h = Math.max(Math.round((m.total / maxBar) * 100), m.total > 0 ? 4 : 2);
+        const isHoy = m.mes === mesActual && m.anio === anioActual;
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+          <div style="font-size:9px;color:var(--gray);text-align:center">${m.total > 0 ? pesos(m.total).replace('$','') : ''}</div>
+          <div style="width:100%;border-radius:4px 4px 0 0;background:${isHoy ? 'var(--purple)' : '#C4BFEE'};height:${h}px;transition:height .3s"></div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;gap:8px">
+      ${meses.map(m => {
+        const isHoy = m.mes === mesActual && m.anio === anioActual;
+        return `<div style="flex:1;text-align:center;font-size:9px;font-weight:${isHoy?'600':'400'};color:${isHoy?'var(--purple)':'var(--gray)'}">${m.label}</div>`;
+      }).join('')}
+    </div>
+  </div>
+
+  <div class="section-label">Detalle por mes</div>`;
+
+  // Mostrar meses de mas reciente a mas viejo
+  [...meses].reverse().forEach(m => {
+    if (m.cant === 0) return;
+    html += `<div style="background:var(--white);border-radius:14px;border:1px solid var(--border);margin-bottom:10px;overflow:hidden">
+      <div style="padding:12px 15px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--gray-d);text-transform:capitalize">${new Date(m.anio,m.mes,1).toLocaleDateString('es-AR',{month:'long',year:'numeric'})}</div>
+          <div style="font-size:11px;color:var(--gray)">${m.cant} venta${m.cant!==1?'s':''}</div>
+        </div>
+        <div style="font-size:17px;font-weight:600;color:var(--purple)">${pesos(m.total)}</div>
+      </div>
+      ${m.ventas.map(v => `
+      <div style="padding:10px 15px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:12px;font-weight:500;color:var(--gray-d)">${v.clienteNombre}</div>
+          <div style="font-size:11px;color:var(--gray)">${v.motoNombre} · ${fmtDate(v.fecha)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:12px;font-weight:600;color:var(--teal)">${pesos(calcComision(v))}</div>
+          <div style="font-size:10px;color:var(--gray)">${pesos(v.precio)}</div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  });
+
+  if (S.ventas.length === 0) {
+    html += `<div class="empty"><div class="empty-icon">$</div><div class="empty-text">Registra tu primera venta para ver las comisiones</div></div>`;
+  }
+
+  el('com-content').innerHTML = html;
+}
+
+function abrirComConfig() {
+  const cfg = getComConfig();
+  el('com-tipo').value = cfg.tipo;
+  el('com-pct').value = cfg.pct;
+  el('com-fijo').value = cfg.fijo;
+  el('com-notas').value = cfg.notas || '';
+  toggleComFields();
+  openSheet('sh-comconfig');
+}
+
+function toggleComFields() {
+  const tipo = el('com-tipo').value;
+  el('com-field-pct').style.display = tipo === 'porcentaje' ? 'block' : 'none';
+  el('com-field-fijo').style.display = tipo === 'fijo' ? 'block' : 'none';
+}
+
+function saveComConfig() {
+  S.comConfig = {
+    tipo: el('com-tipo').value,
+    pct: parseFloat(el('com-pct').value) || 3,
+    fijo: parseInt(el('com-fijo').value) || 0,
+    notas: el('com-notas').value
+  };
+  save(); closeSheet('sh-comconfig');
+  toast('Configuracion guardada!');
+  renderComisiones(); renderStats();
+}
+
 /* ── INIT ────────────────────────────────────────── */
 function renderAll() {
   renderStats();
   const active = document.querySelector('.screen.active');
   if (!active) return;
   const name = active.id.replace('sc-', '');
-  ({ inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, tips: renderTips })[name]?.();
+  ({ inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, tips: renderTips })[name]?.();
 }
 
 function setGreeting() {
