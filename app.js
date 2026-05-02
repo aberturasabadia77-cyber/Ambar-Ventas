@@ -1002,15 +1002,15 @@ async function iaCargaRapida() {
         <div style="font-size:11px;font-weight:600;color:#633806;margin-bottom:8px">Datos detectados:</div>
         ${Object.entries(datos).filter(([,v])=>v).map(([k,v])=>`<div style="font-size:12px;color:var(--gray-d);padding:3px 0;border-bottom:1px solid rgba(0,0,0,0.05)"><b>${k}:</b> ${v}</div>`).join('')}
       </div>
-      <button class="btn btn-primary" style="width:100%" onclick="iaAbrirVentaConDatos(${encodeURIComponent(JSON.stringify(datos))})">Abrir formulario de venta con estos datos</button>`;
+      <button class="btn btn-primary" style="width:100%" id="btn-abrir-venta">Abrir formulario de venta con estos datos</button>`;
+    document.getElementById('btn-abrir-venta').addEventListener('click', () => iaAbrirVentaConDatos(datos));
   } catch(e) {
     iaShowError('ia-resultado-carga', e.message === 'NO_KEY' ? 'Guarda tu API Key primero' : 'No pude interpretar el texto. Intenta ser mas especifico.');
   }
 }
 
-function iaAbrirVentaConDatos(encodedDatos) {
+function iaAbrirVentaConDatos(datos) {
   try {
-    const datos = JSON.parse(decodeURIComponent(encodedDatos));
     openSheet('sh-venta');
     setTimeout(() => {
       if (datos.precio) el('vpr').value = datos.precio;
@@ -1018,20 +1018,27 @@ function iaAbrirVentaConDatos(encodedDatos) {
       if (datos.notas) el('vno').value = datos.notas;
       if (datos.pago) {
         const p = el('vpago');
-        if (datos.pago.toLowerCase().includes('12')) p.value = 'Cuotas x12';
-        else if (datos.pago.toLowerCase().includes('18')) p.value = 'Cuotas x18';
-        else if (datos.pago.toLowerCase().includes('24')) p.value = 'Cuotas x24';
-        else if (datos.pago.toLowerCase().includes('contado')) p.value = 'Contado';
+        const pg = datos.pago.toLowerCase();
+        if (pg.includes('12')) p.value = 'Cuotas x12';
+        else if (pg.includes('18')) p.value = 'Cuotas x18';
+        else if (pg.includes('24')) p.value = 'Cuotas x24';
+        else if (pg.includes('contado')) p.value = 'Contado';
       }
-      const moto = S.motos.find(m =>
-        (m.marca + ' ' + m.modelo).toLowerCase().includes((datos.motoModelo||'').toLowerCase()) ||
-        m.modelo.toLowerCase().includes((datos.motoModelo||'').toLowerCase())
-      );
-      if (moto) el('vm').value = moto.id;
-      const cliente = S.clientes.find(c => c.nombre.toLowerCase().includes((datos.clienteNombre||'').toLowerCase()));
-      if (cliente) el('vc').value = cliente.id;
-    }, 150);
-  } catch(e) {}
+      if (datos.motoModelo) {
+        const moto = S.motos.find(m =>
+          m.modelo.toLowerCase().includes(datos.motoModelo.toLowerCase()) ||
+          (m.marca + ' ' + m.modelo).toLowerCase().includes(datos.motoModelo.toLowerCase())
+        );
+        if (moto) el('vm').value = moto.id;
+      }
+      if (datos.clienteNombre) {
+        const cliente = S.clientes.find(c =>
+          c.nombre.toLowerCase().includes(datos.clienteNombre.toLowerCase())
+        );
+        if (cliente) el('vc').value = cliente.id;
+      }
+    }, 200);
+  } catch(e) { toast('Error al cargar datos: ' + e.message); }
 }
 
 function copiarTexto(txt) {
