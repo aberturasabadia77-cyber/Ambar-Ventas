@@ -4,6 +4,18 @@ const KEY = 'ambar_v1';
 const DAY = 86400000;
 const NOW = new Date();
 
+/* ── PERFIL (debe ir primero, otros modulos lo usan) ── */
+const PERFIL_KEY = 'ambar_perfil_v1';
+function getPerfil() {
+  try {
+    const raw = localStorage.getItem(PERFIL_KEY);
+    return raw ? JSON.parse(raw) : { nombre: '', empresa: '', foto: '', cargo: 'Vendedor/a' };
+  } catch(e) { return { nombre: '', empresa: '', foto: '', cargo: 'Vendedor/a' }; }
+}
+function savePerfil(p) {
+  try { localStorage.setItem(PERFIL_KEY, JSON.stringify(p)); } catch(e) {}
+}
+
 const COLORES_HEX = {
   'Rojo':'#D94040','Negro':'#1C1C1E','Blanco':'#E8E8E8','Azul':'#2563EB',
   'Verde':'#16A34A','Amarillo':'#D97706','Naranja':'#EA580C','Gris':'#6B7280',
@@ -1147,18 +1159,6 @@ function copiarTexto(txt) {
 }
 
 /* ── PERFIL ───────────────────────────────────────── */
-const PERFIL_KEY = 'ambar_perfil_v1';
-
-function getPerfil() {
-  try {
-    const raw = localStorage.getItem(PERFIL_KEY);
-    return raw ? JSON.parse(raw) : { nombre: '', empresa: '', foto: '', cargo: 'Vendedor/a' };
-  } catch(e) { return { nombre: '', empresa: '', foto: '', cargo: 'Vendedor/a' }; }
-}
-
-function savePerfil(p) {
-  try { localStorage.setItem(PERFIL_KEY, JSON.stringify(p)); } catch(e) {}
-}
 
 function updateHeader() {
   const p = getPerfil();
