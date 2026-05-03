@@ -78,17 +78,36 @@ function semVenta(v) {
 }
 
 /* ── MENSAJES ─────────────────────────────────────── */
-function msgCliente(c) {
-  const m = getMotoNombre(c.motoInt);
-  const fn = c.nombre.split(' ')[0];
-  if (c.prioridad === 'alta')
-    return `Hola ${fn}! Te escribo de la concesionaria, soy Ambar.\n\nEstuve pensando en vos — estuviste viendo la ${m} y queria saber si pudiste pensar en la propuesta.\n\nEsta semana tenemos disponibilidad y te puedo reservar una. Cualquier duda me avisas!`;
-  if (c.prioridad === 'media')
-    return `Hola ${fn}! Soy Ambar de la concesionaria.\n\nComo estas? Queria ver si seguia en tus planes lo de la ${m}.\n\nSi queres que te pase el detalle de financiacion o colores disponibles, avisame. Sin compromiso!`;
-  return `Hola ${fn}! Soy Ambar de la concesionaria, te habia atendido cuando viniste a ver motos.\n\nTe escribo para ver si todavia tenes en mente comprarte una. Si queres info actualizada, con gusto te ayudo.`;
+function miNombre() {
+  const p = getPerfil();
+  return p.nombre ? p.nombre.split(' ')[0] : 'tu vendedor/a';
 }
+function miEmpresa() {
+  const p = getPerfil();
+  return p.empresa || 'la concesionaria';
+}
+
+function msgCliente(c) {
+  const moto = getMotoNombre(c.motoInt);
+  const fn = c.nombre.split(' ')[0];
+  const yo = miNombre();
+  const dias = daysDiff(c.fecha);
+  const cuandoVino = dias <= 3 ? 'esta semana' : dias <= 7 ? 'la semana pasada' : `hace ${dias} dias`;
+
+  if (c.prioridad === 'alta')
+    return `Hola ${fn}! Soy ${yo} de ${miEmpresa()}.\n\n${cuandoVino.charAt(0).toUpperCase()+cuandoVino.slice(1)} estuviste viendo la ${moto} — en que punto estas ahora con la decision?\n\nQue te falta pensar o resolver para que sea tuya definitivamente?`;
+
+  if (c.prioridad === 'media')
+    return `Hola ${fn}! Soy ${yo}.\n\n${cuandoVino.charAt(0).toUpperCase()+cuandoVino.slice(1)} te atendi en ${miEmpresa()} cuando viste la ${moto}.\n\nEn que momento estas con la decision? Hay algo que te este frenando — el precio, la financiacion, algun detalle de la moto?\n\nDecime y lo vemos juntos.`;
+
+  return `Hola ${fn}! Soy ${yo}, te atendi en ${miEmpresa()} cuando viniste a ver motos.\n\nTodavia tenes en mente comprarte una? Contame donde estas parado con la idea — si hay algo que te detiene, puedo ayudarte a resolverlo.`;
+}
+
 function msgPostventa(v) {
-  return `Hola ${v.clienteNombre.split(' ')[0]}! Soy Ambar, te ayude con la ${v.motoNombre} ${v.color}.\n\nYa pasaron 15 dias — como la estas disfrutando? Se adapto bien a tu rutina?\n\nSi tenes alguna pregunta del service o del manejo, me escribis cuando quieras. Y si conoces a alguien que este buscando moto, ya sabes donde estoy!`;
+  const yo = miNombre();
+  const fn = v.clienteNombre.split(' ')[0];
+  const moto = `${v.motoNombre}${v.color ? ' ' + v.color : ''}`;
+  return `Hola ${fn}! Soy ${yo}.\n\nYa pasaron 15 dias desde que te llevaste la ${moto} — como te esta yendo? Se adapto la moto a tu manejo?\n\nCumplio las expectativas que tenia? Solo queria saber como te fue con la compra.\n\nFue un placer haberte ayudado a elegirla. Para una proxima o si tenes que recomendar a alguien, ya sabes que aca estoy para ayudar!`;
 }
 
 /* ── NAVIGATION ─────────────────────────────────── */
@@ -815,15 +834,24 @@ function catalogoResumen() {
 
 function renderIA() {
   const key = getGroqKey();
+  const keyConfigured = key && key.length > 10;
   const keyHtml = `
   <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:14px;margin-bottom:14px">
-    <div style="font-size:12px;font-weight:600;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">API Key de Groq</div>
-    <div style="display:flex;gap:8px">
-      <input id="groq-key-input" type="password" placeholder="gsk_..." value="${key}"
-        style="flex:1;font-size:13px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d);font-family:var(--font)">
-      <button class="btn btn-primary" onclick="guardarGroqKey()" style="flex-shrink:0">Guardar</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${keyConfigured?'0':'12px'}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:8px;height:8px;border-radius:50%;background:${keyConfigured?'var(--teal-m)':'var(--red)'}"></div>
+        <div style="font-size:13px;font-weight:500;color:var(--gray-d)">Asistente IA ${keyConfigured?'activado':'sin configurar'}</div>
+      </div>
+      <button onclick="toggleGroqConfig()" style="font-size:11px;color:var(--purple);background:var(--purple-l);border:1px solid var(--purple-m);border-radius:20px;padding:4px 12px;cursor:pointer;font-weight:500">${keyConfigured?'Cambiar clave':'Configurar'}</button>
     </div>
-    <div style="font-size:10px;color:var(--gray);margin-top:6px">Gratis en <b>console.groq.com</b> → API Keys → Create API Key</div>
+    <div id="groq-config-panel" style="display:${keyConfigured?'none':'block'}">
+      <div style="font-size:11px;color:var(--gray);margin-bottom:8px">Ingresa tu clave gratuita de <b>console.groq.com</b> → API Keys</div>
+      <div style="display:flex;gap:8px">
+        <input id="groq-key-input" type="password" placeholder="gsk_..." autocomplete="off"
+          style="flex:1;font-size:13px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d);font-family:var(--font)">
+        <button class="btn btn-primary" onclick="guardarGroqKey()" style="flex-shrink:0">Guardar</button>
+      </div>
+    </div>
   </div>`;
 
   const sugerirHtml = `
@@ -938,11 +966,25 @@ function renderIA() {
   el('ia-content').innerHTML = keyHtml + sugerirHtml + mensajeHtml + cargaHtml;
 }
 
+function toggleGroqConfig() {
+  const panel = document.getElementById('groq-config-panel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'block') {
+    const input = document.getElementById('groq-key-input');
+    if (input) input.focus();
+  }
+}
+
 function guardarGroqKey() {
-  const k = el('groq-key-input').value.trim();
+  const input = el('groq-key-input');
+  if (!input) return;
+  const k = input.value.trim();
   if (!k.startsWith('gsk_')) { toast('La clave debe empezar con gsk_'); return; }
   setGroqKey(k);
-  toast('Clave guardada! Ya podes usar el asistente.');
+  input.value = '';
+  toast('Clave guardada! Asistente IA activado.');
+  renderIA();
 }
 
 function iaShowLoading(containerId) {
@@ -967,7 +1009,7 @@ async function iaSugerirMoto() {
   const exp = el('ia-exp').value;
   const notas = el('ia-notas').value;
 
-  const system = `Sos Ambar, vendedora experta de motos en Argentina. Analizas el perfil del cliente y sugeris la mejor moto del catalogo disponible. Respondas en espanol argentino, de forma directa y util para la vendedora. Tu respuesta tiene 3 partes: 1) MOTO RECOMENDADA (nombre y por que), 2) ARGUMENTO DE CIERRE (frase exacta para decirle al cliente), 3) OBJECIONES POSIBLES Y RESPUESTAS (maximo 2). Total maximo 200 palabras.`;
+  const system = `Sos ${miNombre()}, vendedor/a experto/a de motos en ${miEmpresa()}, Argentina. Analizas el perfil del cliente y sugeris la mejor moto del catalogo disponible. Respondas en espanol argentino, de forma directa y util para la vendedora. Tu respuesta tiene 3 partes: 1) MOTO RECOMENDADA (nombre y por que), 2) ARGUMENTO DE CIERRE (frase exacta para decirle al cliente), 3) OBJECIONES POSIBLES Y RESPUESTAS (maximo 2). Total maximo 200 palabras.`;
 
   const user = `CATALOGO DISPONIBLE:\n${catalogoResumen()}\n\nPERFIL DEL CLIENTE:\n- Presupuesto maximo: $${presupuesto.toLocaleString('es-AR')}\n- Uso: ${uso}\n- Pago: ${pago}\n- Experiencia: ${exp}\n${notas ? '- Notas: ' + notas : ''}\n\nSugeri la mejor moto y dame el argumento de cierre exacto.`;
 
@@ -1001,7 +1043,7 @@ async function iaGenerarMensaje() {
     reactivar: 'reactivar contacto con un cliente que no responde hace tiempo'
   };
 
-  const system = `Sos Ambar, vendedora de motos en Argentina. Escribis mensajes de WhatsApp naturales, calidos y efectivos. Mensajes cortos (maximo 5 lineas), en espanol argentino informal, sin emojis exagerados, que suenen a persona real no a bot. Solo respondas con el mensaje, nada mas.`;
+  const system = `Sos ${miNombre()}, vendedor/a de motos en ${miEmpresa()}, Argentina. Escribis mensajes de WhatsApp naturales, directos y efectivos. Mensajes cortos (maximo 5 lineas), en espanol argentino informal, sin emojis exagerados, que suenen a persona real no a bot. Usas preguntas directas que obligan a responder. Solo respondas con el mensaje, nada mas. Firma como ${miNombre()} de ${miEmpresa()}.`;
 
   const user = `Escribi un mensaje de WhatsApp de ${tipoDesc[tipo]}.\nNombre del cliente: ${nombre}\nMoto: ${moto}\n${contexto ? 'Contexto: ' + contexto : ''}\nFirma siempre como Ambar de la concesionaria.`;
 
