@@ -1206,24 +1206,21 @@ function updateHeader() {
 
 function renderPerfil() {
   const p = getPerfil();
-  const fotoHtml = p.foto
-    ? `<img src="${p.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
-    : `<svg width="50" height="50" viewBox="0 0 24 24" fill="var(--gray-m)"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>`;
+  const hasFoto = p.foto && p.foto.length > 10;
+  const bgStyle = hasFoto ? 'background-image:url(' + p.foto + ');background-size:cover;background-position:center;' : '';
 
   el('perfil-content').innerHTML = `
-  <!-- AVATAR GRANDE -->
   <div style="display:flex;flex-direction:column;align-items:center;padding:24px 0 20px">
-    <div style="width:110px;height:110px;border-radius:50%;border:3px solid var(--purple-m);overflow:hidden;background:var(--gray-l);display:flex;align-items:center;justify-content:center;margin-bottom:12px;cursor:pointer;position:relative" onclick="el('perfil-foto-input').click()">
-      ${fotoHtml}
-      <div style="position:absolute;bottom:0;right:0;background:var(--purple);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid white">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+    <div id="perfil-circle" onclick="el('perfil-foto-input').click()" style="width:110px;height:110px;border-radius:50%;border:3px solid var(--purple-m);overflow:hidden;background:var(--gray-l);display:flex;align-items:center;justify-content:center;margin-bottom:12px;cursor:pointer;position:relative;${bgStyle}">
+      <svg style="display:${hasFoto?'none':'block'}" width="50" height="50" viewBox="0 0 24 24" fill="var(--gray-m)"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+      <div style="position:absolute;bottom:2px;right:2px;background:var(--purple);border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:2px solid white">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
       </div>
     </div>
     <input type="file" id="perfil-foto-input" accept="image/*" style="display:none" onchange="handlePerfilFoto(this)">
-    <div style="font-size:11px;color:var(--gray)">Tocar la foto para cambiarla</div>
+    <div style="font-size:11px;color:var(--gray)">Tocar para cambiar la foto</div>
   </div>
 
-  <!-- DATOS DEL VENDEDOR -->
   <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:16px;margin-bottom:12px">
     <div style="font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px">Datos del vendedor</div>
     <div class="field"><label>Nombre completo *</label>
@@ -1243,7 +1240,6 @@ function renderPerfil() {
     </div>
   </div>
 
-  <!-- DATOS DE LA EMPRESA -->
   <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:16px;margin-bottom:12px">
     <div style="font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px">Concesionaria</div>
     <div class="field"><label>Nombre de la concesionaria</label>
@@ -1251,20 +1247,19 @@ function renderPerfil() {
     </div>
     <div class="field"><label>Logo de la empresa</label>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
-        <div id="logo-preview" style="width:56px;height:56px;border-radius:10px;border:1.5px solid var(--border-m);overflow:hidden;background:var(--gray-l);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0" onclick="el('perfil-logo-input').click()">
-          ${p.logo ? `<img src="${p.logo}" style="width:100%;height:100%;object-fit:contain">` : `<svg width="22" height="22" viewBox="0 0 24 24" fill="var(--gray-m)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`}
+        <div id="logo-preview" onclick="el('perfil-logo-input').click()" style="width:56px;height:56px;border-radius:10px;border:1.5px solid var(--border-m);overflow:hidden;background:var(--gray-l);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;${p.logo?'background-image:url('+p.logo+');background-size:contain;background-repeat:no-repeat;background-position:center;':''}" >
+          ${p.logo ? '' : '<svg width="22" height="22" viewBox="0 0 24 24" fill="var(--gray-m)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>'}
         </div>
         <div style="flex:1">
           <input id="perfil-logo-url" value="${p.logo && p.logo.startsWith('http') ? p.logo : ''}" placeholder="URL del logo (https://...)" oninput="handleLogoUrl(this.value)"
             style="width:100%;font-size:12px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d);font-family:var(--font)">
-          <div style="font-size:10px;color:var(--gray);margin-top:4px">O tocá el cuadrado para subir imagen</div>
+          <div style="font-size:10px;color:var(--gray);margin-top:4px">O toca el cuadrado para subir imagen</div>
         </div>
       </div>
       <input type="file" id="perfil-logo-input" accept="image/*" style="display:none" onchange="handleLogoFile(this)">
     </div>
   </div>
 
-  <!-- BOTON GUARDAR -->
   <button class="btn btn-primary" style="width:100%;min-height:50px;font-size:15px;border-radius:12px;margin-bottom:20px" onclick="guardarPerfil()">
     Guardar perfil
   </button>`;
@@ -1273,16 +1268,45 @@ function renderPerfil() {
 function handlePerfilFoto(input) {
   const file = input.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
+
+  // Resize image before saving to avoid localStorage size limits
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+
+  img.onload = function() {
+    const size = 300;
+    canvas.width = size;
+    canvas.height = size;
+    // Crop to square from center
+    const min = Math.min(img.width, img.height);
+    const sx = (img.width - min) / 2;
+    const sy = (img.height - min) / 2;
+    ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+    URL.revokeObjectURL(url);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
     const p = getPerfil();
-    p.foto = e.target.result;
+    p.foto = dataUrl;
     savePerfil(p);
+
+    // Update header circle
     updateHeader();
-    renderPerfil();
-    toast('Foto actualizada!');
+
+    // Update perfil circle directly without full re-render
+    const circle = document.getElementById('perfil-circle');
+    if (circle) {
+      circle.style.backgroundImage = 'url(' + dataUrl + ')';
+      circle.style.backgroundSize = 'cover';
+      circle.style.backgroundPosition = 'center';
+      const svg = circle.querySelector('svg');
+      if (svg) svg.style.display = 'none';
+    }
+
+    toast('Foto guardada!');
   };
-  reader.readAsDataURL(file);
+  img.src = url;
 }
 
 function handleLogoFile(input) {
