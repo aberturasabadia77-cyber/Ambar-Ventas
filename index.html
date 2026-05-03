@@ -63,7 +63,7 @@ html, body {
 .app {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  min-height: 100dvh;
   max-width: 430px;
   margin: 0 auto;
   background: var(--gray-ll);
@@ -184,7 +184,6 @@ html, body {
   overflow-y: auto;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
 }
 .screen { display: none; padding: 14px 14px 90px; }
 .screen.active { display: block; }
