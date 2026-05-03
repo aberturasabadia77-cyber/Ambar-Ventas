@@ -91,35 +91,34 @@ function semVenta(v) {
 
 /* ── MENSAJES ─────────────────────────────────────── */
 function miNombre() {
-  const p = getPerfil();
-  return p.nombre ? p.nombre.split(' ')[0] : 'tu vendedor/a';
+  try { const p = getPerfil(); return p.nombre ? p.nombre.split(' ')[0] : 'tu vendedor/a'; } catch(e) { return 'tu vendedor/a'; }
 }
 function miEmpresa() {
-  const p = getPerfil();
-  return p.empresa || 'la concesionaria';
+  try { const p = getPerfil(); return p.empresa || 'la concesionaria'; } catch(e) { return 'la concesionaria'; }
 }
 
 function msgCliente(c) {
   const moto = getMotoNombre(c.motoInt);
   const fn = c.nombre.split(' ')[0];
   const yo = miNombre();
-  const dias = daysDiff(c.fecha);
-  const cuandoVino = dias <= 3 ? 'esta semana' : dias <= 7 ? 'la semana pasada' : `hace ${dias} dias`;
+  const emp = miEmpresa();
+  const dias = ago(c.fecha);
+  const cuando = dias <= 3 ? 'esta semana' : dias <= 7 ? 'la semana pasada' : 'hace ' + dias + ' dias';
 
   if (c.prioridad === 'alta')
-    return `Hola ${fn}! Soy ${yo} de ${miEmpresa()}.\n\n${cuandoVino.charAt(0).toUpperCase()+cuandoVino.slice(1)} estuviste viendo la ${moto} — en que punto estas ahora con la decision?\n\nQue te falta pensar o resolver para que sea tuya definitivamente?`;
+    return 'Hola ' + fn + '! Soy ' + yo + ' de ' + emp + '.\n\n' + cuando.charAt(0).toUpperCase() + cuando.slice(1) + ' estuviste viendo la ' + moto + '. En que punto estas ahora con la decision?\n\nQue te falta pensar o resolver para que sea tuya definitivamente?';
 
   if (c.prioridad === 'media')
-    return `Hola ${fn}! Soy ${yo}.\n\n${cuandoVino.charAt(0).toUpperCase()+cuandoVino.slice(1)} te atendi en ${miEmpresa()} cuando viste la ${moto}.\n\nEn que momento estas con la decision? Hay algo que te este frenando — el precio, la financiacion, algun detalle de la moto?\n\nDecime y lo vemos juntos.`;
+    return 'Hola ' + fn + '! Soy ' + yo + ' de ' + emp + '.\n\n' + cuando.charAt(0).toUpperCase() + cuando.slice(1) + ' viste la ' + moto + '. En que momento estas con la decision?\n\nHay algo que te este frenando? Decime y lo vemos juntos.';
 
-  return `Hola ${fn}! Soy ${yo}, te atendi en ${miEmpresa()} cuando viniste a ver motos.\n\nTodavia tenes en mente comprarte una? Contame donde estas parado con la idea — si hay algo que te detiene, puedo ayudarte a resolverlo.`;
+  return 'Hola ' + fn + '! Soy ' + yo + ' de ' + emp + ', te atendi cuando viniste a ver motos.\n\nTodavia tenes en mente comprarte una? Si hay algo que te detiene, puedo ayudarte a resolverlo.';
 }
 
 function msgPostventa(v) {
   const yo = miNombre();
   const fn = v.clienteNombre.split(' ')[0];
-  const moto = `${v.motoNombre}${v.color ? ' ' + v.color : ''}`;
-  return `Hola ${fn}! Soy ${yo}.\n\nYa pasaron 15 dias desde que te llevaste la ${moto} — como te esta yendo? Se adapto la moto a tu manejo?\n\nCumplio las expectativas que tenia? Solo queria saber como te fue con la compra.\n\nFue un placer haberte ayudado a elegirla. Para una proxima o si tenes que recomendar a alguien, ya sabes que aca estoy para ayudar!`;
+  const moto = v.motoNombre + (v.color ? ' ' + v.color : '');
+  return 'Hola ' + fn + '! Soy ' + yo + '.\n\nYa pasaron 15 dias desde que te llevaste la ' + moto + '. Como te esta yendo? Se adapto la moto a tu manejo?\n\nCumplio las expectativas? Solo queria saber como te fue con la compra. Fue un placer haberte ayudado. Para una proxima o si tenes que recomendar a alguien, ya sabes que aca estoy!';
 }
 
 /* ── NAVIGATION ─────────────────────────────────── */
