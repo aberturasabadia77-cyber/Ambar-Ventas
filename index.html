@@ -56,7 +56,6 @@ html, body {
   background: var(--gray-ll);
   color: var(--gray-d);
   height: 100%;
-  overflow: hidden;
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
 }
@@ -124,19 +123,20 @@ html, body {
 .stats-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  padding: 14px 0 0;
+  gap: 6px;
+  padding: 12px 0 0;
   position: relative;
   z-index: 1;
 }
 .stat-item {
   background: rgba(255,255,255,0.12);
   border-radius: 10px;
-  padding: 9px 8px;
+  padding: 8px 4px;
   text-align: center;
   border: 1px solid rgba(255,255,255,0.1);
+  overflow: hidden;
 }
-.stat-num { color: #fff; font-size: 18px; font-weight: 600; line-height: 1; }
+.stat-num { color: #fff; font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat-num.alert { color: #FFCDD2; }
 .stat-num.ok { color: #B2F0D4; }
 .stat-lbl { color: rgba(255,255,255,0.5); font-size: 9px; margin-top: 3px; font-weight: 400; }
@@ -182,7 +182,7 @@ html, body {
 .content {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
@@ -503,6 +503,10 @@ html, body {
         <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
         Perfil
       </button>
+      <button class="nav-pill" onclick="goScreen('entrega',this)">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+        Entrega
+      </button>
     </div>
   </div>
 
@@ -574,6 +578,11 @@ html, body {
     <!-- PERFIL -->
     <div id="sc-perfil" class="screen">
       <div id="perfil-content"></div>
+    </div>
+
+    <!-- ENTREGA -->
+    <div id="sc-entrega" class="screen">
+      <div id="entrega-content"></div>
     </div>
 
     <!-- TIPS -->

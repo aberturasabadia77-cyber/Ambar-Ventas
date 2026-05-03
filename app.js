@@ -127,7 +127,7 @@ function goScreen(name, btn) {
   document.querySelectorAll('.nav-pill').forEach(b => b.classList.remove('active'));
   el('sc-' + name).classList.add('active');
   btn.classList.add('active');
-  const renders = { inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, ia: renderIA, perfil: renderPerfil, tips: renderTips };
+  const renders = { inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, ia: renderIA, perfil: renderPerfil, entrega: renderEntrega, tips: renderTips };
   renders[name] && renders[name]();
 }
 
@@ -1354,13 +1354,131 @@ function guardarPerfil() {
   toast('Perfil guardado!');
 }
 
-/* ── INIT ────────────────────────────────────────── */
+/* ── ENTREGA ─────────────────────────────────────── */
+function renderEntrega() {
+  const ventasRecientes = S.ventas.slice(0, 10);
+  el('entrega-content').innerHTML = `
+  <div style="background:linear-gradient(135deg,var(--purple),var(--purple-d));border-radius:14px;padding:16px;margin-bottom:14px;color:white">
+    <div style="font-size:15px;font-weight:600;margin-bottom:4px">Formulario de entrega</div>
+    <div style="font-size:12px;opacity:.8">La IA genera el checklist completo segun la provincia y el tipo de operacion</div>
+  </div>
+
+  <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:14px;margin-bottom:12px">
+    <div style="font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Datos de la entrega</div>
+    <div class="field"><label>Venta asociada</label>
+      <select id="ent-venta" onchange="entCargarVenta(this.value)" style="width:100%;font-size:14px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d)">
+        <option value="">-- Seleccionar venta --</option>
+        ${ventasRecientes.map(v => '<option value="' + v.id + '">' + v.clienteNombre + ' · ' + v.motoNombre + '</option>').join('')}
+      </select>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Nombre comprador</label><input id="ent-nombre" placeholder="Juan Lopez"></div>
+      <div class="field"><label>DNI</label><input id="ent-dni" placeholder="12.345.678" inputmode="numeric"></div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Telefono</label><input id="ent-tel" placeholder="11 5544 3322" type="tel"></div>
+      <div class="field"><label>Email</label><input id="ent-email" placeholder="correo@gmail.com" type="email"></div>
+    </div>
+    <div class="field"><label>Domicilio</label><input id="ent-domicilio" placeholder="Av. Corrientes 1234, CABA"></div>
+    <div class="two-col">
+      <div class="field"><label>Provincia</label>
+        <select id="ent-provincia" style="width:100%;font-size:14px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d)">
+          <option>Buenos Aires</option><option>CABA</option><option>Cordoba</option>
+          <option>Santa Fe</option><option>Mendoza</option><option>Tucuman</option>
+          <option>Salta</option><option>Neuquen</option><option>Chubut</option>
+          <option>Otro</option>
+        </select>
+      </div>
+      <div class="field"><label>Fecha de entrega</label><input id="ent-fecha" type="date"></div>
+    </div>
+  </div>
+
+  <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:14px;margin-bottom:12px">
+    <div style="font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Datos de la moto</div>
+    <div class="two-col">
+      <div class="field"><label>Moto</label><input id="ent-moto" placeholder="Honda CB 190R"></div>
+      <div class="field"><label>Color</label><input id="ent-color" placeholder="Rojo"></div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>N° de motor</label><input id="ent-motor" placeholder="ABC123456"></div>
+      <div class="field"><label>N° de chasis</label><input id="ent-chasis" placeholder="9FA123456"></div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Patente (si ya tiene)</label><input id="ent-patente" placeholder="AA123BB"></div>
+      <div class="field"><label>Precio final ($)</label><input id="ent-precio" type="number" inputmode="numeric" placeholder="480000"></div>
+    </div>
+    <div class="field"><label>Forma de pago</label>
+      <select id="ent-pago" style="width:100%;font-size:14px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d)">
+        <option>Contado efectivo</option><option>Transferencia bancaria</option>
+        <option>Financiacion propia</option><option>Credito bancario</option><option>Cuotas tarjeta</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" style="width:100%;min-height:48px;font-size:14px;margin-bottom:10px" onclick="iaGenerarChecklist()">
+    Generar checklist de entrega con IA
+  </button>
+  <div id="ent-checklist" style="margin-bottom:20px"></div>`;
+
+  // Set today as default date
+  const fechaEl = document.getElementById('ent-fecha');
+  if (fechaEl) fechaEl.value = todayStr();
+}
+
+function entCargarVenta(id) {
+  if (!id) return;
+  const v = S.ventas.find(x => x.id == id);
+  if (!v) return;
+  const nombre = el('ent-nombre'); if (nombre) nombre.value = v.clienteNombre;
+  const moto = el('ent-moto'); if (moto) moto.value = v.motoNombre;
+  const color = el('ent-color'); if (color) color.value = v.color || '';
+  const precio = el('ent-precio'); if (precio) precio.value = v.precio || '';
+  const pago = el('ent-pago');
+  if (pago && v.pago) {
+    if (v.pago.includes('12') || v.pago.includes('18') || v.pago.includes('24')) pago.value = 'Financiacion propia';
+    else if (v.pago === 'Contado') pago.value = 'Contado efectivo';
+  }
+  // Try to find client data
+  const c = S.clientes.find(x => x.nombre === v.clienteNombre);
+  if (c && c.tel) { const tel = el('ent-tel'); if (tel) tel.value = c.tel; }
+}
+
+async function iaGenerarChecklist() {
+  if (!getGroqKey()) { toast('Necesitas la API Key de Groq en Asistente IA'); return; }
+
+  const nombre = (el('ent-nombre') || {}).value || 'el comprador';
+  const moto = (el('ent-moto') || {}).value || 'la moto';
+  const provincia = (el('ent-provincia') || {}).value || 'Buenos Aires';
+  const pago = (el('ent-pago') || {}).value || 'Contado';
+  const precio = (el('ent-precio') || {}).value || '';
+
+  el('ent-checklist').innerHTML = '<div style="text-align:center;padding:20px;color:var(--gray);font-size:13px">Generando checklist...</div>';
+
+  const system = 'Sos un experto en tramites de venta de motos en Argentina. Generas checklists practicos y completos para vendedores. Respondas en espanol argentino, en formato de lista clara con emojis, agrupado por categorias. Maximo 300 palabras.';
+  const user = 'Genera el checklist completo de documentacion y tramites necesarios para la entrega de una moto en ' + provincia + '.\n\nDatos de la operacion:\n- Comprador: ' + nombre + '\n- Moto: ' + moto + '\n- Forma de pago: ' + pago + (precio ? '\n- Precio: $' + precio : '') + '\n\nIncluye: documentos del comprador, documentos de la moto, tramites post-venta, lo que el vendedor tiene que entregar y lo que tiene que retener. Separa por categorias claras.';
+
+  try {
+    const resp = await groqCall(system, user);
+    el('ent-checklist').innerHTML = `
+      <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:600;color:var(--gray-d)">Checklist generado por IA</div>
+          <span class="badge b-purple">` + provincia + `</span>
+        </div>
+        <div style="font-size:13px;color:var(--gray-d);line-height:1.8;white-space:pre-line">` + resp + `</div>
+        <button class="btn btn-primary" style="width:100%;margin-top:14px" onclick="copiarTexto(document.getElementById('ent-checklist-txt').value)">Copiar checklist</button>
+        <textarea id="ent-checklist-txt" style="display:none">` + resp + `</textarea>
+      </div>`;
+  } catch(e) {
+    el('ent-checklist').innerHTML = '<div style="background:var(--red-l);border-radius:10px;padding:12px;font-size:12px;color:var(--red-d)">Error: ' + e.message + '</div>';
+  }
+}
 function renderAll() {
   renderStats();
   const active = document.querySelector('.screen.active');
   if (!active) return;
   const name = active.id.replace('sc-', '');
-  ({ inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, ia: renderIA, perfil: renderPerfil, tips: renderTips })[name]?.();
+  ({ inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, ia: renderIA, perfil: renderPerfil, entrega: renderEntrega, tips: renderTips })[name]?.();
 }
 
 function setGreeting() {
