@@ -1176,29 +1176,33 @@ function copiarTexto(txt) {
 
 function updateHeader() {
   const p = getPerfil();
+
   const nombreEl = document.getElementById('header-name');
   const empresaEl = document.getElementById('header-empresa');
   const avatarImg = document.getElementById('header-avatar-img');
   const avatarIcon = document.getElementById('header-avatar-icon');
 
   if (nombreEl) nombreEl.textContent = p.nombre || 'Mi nombre';
+
   if (empresaEl) {
     empresaEl.textContent = p.empresa || '';
     empresaEl.style.display = p.empresa ? 'block' : 'none';
   }
-  if (avatarImg && avatarIcon) {
-    if (p.foto) {
+
+  if (avatarImg) {
+    if (p.foto && p.foto.length > 10) {
       avatarImg.src = p.foto;
-      avatarImg.style.display = 'block';
-      avatarIcon.style.display = 'none';
+      avatarImg.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;border-radius:50%';
+      if (avatarIcon) avatarIcon.style.display = 'none';
     } else {
+      avatarImg.src = '';
       avatarImg.style.display = 'none';
-      avatarIcon.style.display = 'block';
+      if (avatarIcon) avatarIcon.style.display = 'block';
     }
   }
 
-  // Update page title
   if (p.empresa) document.title = p.empresa + ' · Ventas';
+  else document.title = 'Ventas';
 }
 
 function renderPerfil() {
@@ -1310,15 +1314,19 @@ function handleLogoUrl(url) {
 function guardarPerfil() {
   const nombre = (el('perfil-nombre') || {}).value || '';
   if (!nombre.trim()) { toast('Ingresa tu nombre'); return; }
+  const fotoActual = getPerfil().foto || '';
+  const fotoNueva = window._tempFoto !== undefined ? window._tempFoto : fotoActual;
   const p = {
     nombre: nombre.trim(),
     cargo: (el('perfil-cargo') || {}).value || 'Vendedor/a',
     tel: (el('perfil-tel') || {}).value || '',
     empresa: (el('perfil-empresa') || {}).value || '',
-    foto: getPerfil().foto || '',
+    foto: fotoNueva,
     logo: window._tempLogo !== undefined ? window._tempLogo : getPerfil().logo || ''
   };
   savePerfil(p);
+  window._tempFoto = undefined;
+  window._tempLogo = undefined;
   updateHeader();
   toast('Perfil guardado!');
 }
