@@ -204,6 +204,15 @@ function renderStats() {
   el('bdot-seguimiento').classList.toggle('show', urgentes > 0);
 }
 
+/* ── STORE DE MENSAJES (evita problemas con chars especiales en HTML) ── */
+const _msgStore = {};
+let _msgIdx = 0;
+function storMsg(title, text) {
+  const key = 'msg_' + (_msgIdx++);
+  _msgStore[key] = { t: title, m: text };
+  return key;
+}
+
 /* ── RENDER INICIO ───────────────────────────────── */
 function renderInicio() {
   renderStats();
@@ -211,20 +220,22 @@ function renderInicio() {
   S.ventas.forEach(v => {
     const s = semVenta(v); if (!s || s.key !== 'azul' || !s.dot) return;
     const msg = msgPostventa(v);
+    const k = storMsg('Post-venta · ' + v.clienteNombre, msg);
     alertas += contactCard({
       nombre: v.clienteNombre, subtipo: 'Post-venta', meta: v.motoNombre + ' ' + v.color,
       nota: '', sem: s,
-      btns: `<button class="btn btn-primary btn-sm" onclick="verMsg('${encodeURI(JSON.stringify({t:'Post-venta · '+v.clienteNombre,m:msg}))}')">Ver mensaje</button>
+      btns: `<button class="btn btn-primary btn-sm" onclick="verMsg('${k}')">Ver mensaje</button>
              <button class="btn btn-sm" onclick="marcarVenta(${v.id})">Marcar listo</button>`
     });
   });
   S.clientes.forEach(c => {
     const s = semCliente(c); if (!s.dot) return;
     const msg = msgCliente(c);
+    const k = storMsg('Seguimiento · ' + c.nombre, msg);
     alertas += contactCard({
       nombre: c.nombre, subtipo: c.tipo, meta: getMotoNombre(c.motoInt) + ' · hace ' + ago(c.fecha) + 'd',
       nota: c.notas, sem: s,
-      btns: `<button class="btn btn-primary btn-sm" onclick="verMsg('${encodeURI(JSON.stringify({t:'Seguimiento · '+c.nombre,m:msg}))}')">Ver mensaje</button>
+      btns: `<button class="btn btn-primary btn-sm" onclick="verMsg('${k}')">Ver mensaje</button>
              <button class="btn btn-sm" onclick="quitarCliente(${c.id})">Quitar</button>`
     });
   });
@@ -257,11 +268,12 @@ function renderSeg(filtro) {
     if (filtro === 'verde') return;
     if (filtro === 'azul' && s.key !== 'azul') return;
     const msg = msgPostventa(v);
+    const k = storMsg('Post-venta · ' + v.clienteNombre, msg);
     html += contactCard({
       nombre: v.clienteNombre, subtipo: 'Post-venta',
       meta: v.motoNombre + ' · ' + fmtDate(v.fecha),
       nota: v.notas, sem: s,
-      btns: `<button class="btn btn-primary btn-sm" onclick="verMsg('${encodeURI(JSON.stringify({t:'Post-venta · '+v.clienteNombre,m:msg}))}')">Ver mensaje</button>
+      btns: `<button class="btn btn-primary btn-sm" onclick="verMsg('${k}')">Ver mensaje</button>
              <button class="btn btn-sm" onclick="marcarVenta(${v.id})">Marcar listo</button>`
     });
   });
@@ -272,11 +284,12 @@ function renderSeg(filtro) {
     if (filtro === 'naranja' && s.cls !== 'b-amber') return;
     if (filtro === 'verde' && s.cls !== 'b-green') return;
     const msg = msgCliente(c);
+    const k = storMsg('Seguimiento · ' + c.nombre, msg);
     html += contactCard({
       nombre: c.nombre, subtipo: c.tipo,
       meta: getMotoNombre(c.motoInt) + ' · hace ' + ago(c.fecha) + 'd',
       nota: c.notas, sem: s,
-      btns: `<button class="btn btn-primary btn-sm" onclick="verMsg('${encodeURI(JSON.stringify({t:'Seguimiento · '+c.nombre,m:msg}))}')">Ver mensaje</button>
+      btns: `<button class="btn btn-primary btn-sm" onclick="verMsg('${k}')">Ver mensaje</button>
              <button class="btn btn-sm" onclick="quitarCliente(${c.id})">Quitar</button>`
     });
   });
@@ -298,11 +311,12 @@ function renderProspectos() {
   el('prosp-list').innerHTML = list.map(c => {
     const s = semCliente(c);
     const msg = msgCliente(c);
+    const k = storMsg('Mensaje · ' + c.nombre, msg);
     return contactCard({
       nombre: c.nombre, subtipo: c.tipo,
       meta: getMotoNombre(c.motoInt) + ' · ' + c.tel,
       nota: c.notas, sem: s,
-      btns: `<button class="btn btn-primary btn-sm" onclick="verMsg('${encodeURI(JSON.stringify({t:'Msg · '+c.nombre,m:msg}))}')">Mensaje</button>
+      btns: `<button class="btn btn-primary btn-sm" onclick="verMsg('${k}')">Mensaje</button>
              <button class="btn btn-sm" onclick="abrirVentaDesde(${c.id})">+ Venta</button>
              <button class="btn btn-danger btn-sm" onclick="quitarCliente(${c.id})">Quitar</button>`
     });
@@ -510,8 +524,9 @@ function renderTips() {
 }
 
 /* ── MSG SHEET ───────────────────────────────────── */
-function verMsg(encoded) {
-  const d = JSON.parse(decodeURI(encoded));
+function verMsg(key) {
+  const d = _msgStore[key];
+  if (!d) { toast('Mensaje no disponible'); return; }
   el('msg-title').textContent = d.t;
   el('msg-txt').value = d.m;
   openSheet('sh-msg');
