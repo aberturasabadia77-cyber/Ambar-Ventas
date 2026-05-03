@@ -1179,7 +1179,7 @@ function updateHeader() {
 
   const nombreEl = document.getElementById('header-name');
   const empresaEl = document.getElementById('header-empresa');
-  const avatarDiv = document.getElementById('header-avatar');
+  const avatarImg = document.getElementById('header-avatar-img');
   const avatarIcon = document.getElementById('header-avatar-icon');
 
   if (nombreEl) nombreEl.textContent = p.nombre || 'Mi nombre';
@@ -1189,14 +1189,14 @@ function updateHeader() {
     empresaEl.style.display = p.empresa ? 'block' : 'none';
   }
 
-  if (avatarDiv) {
+  if (avatarImg) {
     if (p.foto && p.foto.length > 10) {
-      avatarDiv.style.backgroundImage = 'url(' + p.foto + ')';
-      avatarDiv.style.backgroundSize = 'cover';
-      avatarDiv.style.backgroundPosition = 'center';
+      avatarImg.setAttribute('src', p.foto);
+      avatarImg.style.display = 'block';
       if (avatarIcon) avatarIcon.style.display = 'none';
     } else {
-      avatarDiv.style.backgroundImage = 'none';
+      avatarImg.setAttribute('src', '');
+      avatarImg.style.display = 'none';
       if (avatarIcon) avatarIcon.style.display = 'block';
     }
   }
