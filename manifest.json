@@ -1,10 +1,9 @@
 {
-  "name": "Ambar Ventas",
-  "short_name": "Ambar",
-  "description": "App de gestión de ventas de motos para Ambar",
+  "name": "Ventas Motos",
+  "short_name": "Ventas",
+  "description": "App de gestion de ventas de motos",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#4C3FD4",
   "theme_color": "#4C3FD4",
   "icons": [

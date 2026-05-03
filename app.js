@@ -1179,7 +1179,7 @@ function updateHeader() {
 
   const nombreEl = document.getElementById('header-name');
   const empresaEl = document.getElementById('header-empresa');
-  const avatarImg = document.getElementById('header-avatar-img');
+  const avatarDiv = document.getElementById('header-avatar');
   const avatarIcon = document.getElementById('header-avatar-icon');
 
   if (nombreEl) nombreEl.textContent = p.nombre || 'Mi nombre';
@@ -1189,20 +1189,19 @@ function updateHeader() {
     empresaEl.style.display = p.empresa ? 'block' : 'none';
   }
 
-  if (avatarImg) {
+  if (avatarDiv) {
     if (p.foto && p.foto.length > 10) {
-      avatarImg.src = p.foto;
-      avatarImg.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;border-radius:50%';
+      avatarDiv.style.backgroundImage = 'url(' + p.foto + ')';
+      avatarDiv.style.backgroundSize = 'cover';
+      avatarDiv.style.backgroundPosition = 'center';
       if (avatarIcon) avatarIcon.style.display = 'none';
     } else {
-      avatarImg.src = '';
-      avatarImg.style.display = 'none';
+      avatarDiv.style.backgroundImage = 'none';
       if (avatarIcon) avatarIcon.style.display = 'block';
     }
   }
 
-  if (p.empresa) document.title = p.empresa + ' · Ventas';
-  else document.title = 'Ventas';
+  document.title = p.empresa ? p.empresa + ' · Ventas' : 'Ventas';
 }
 
 function renderPerfil() {
