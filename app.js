@@ -97,7 +97,7 @@ function goScreen(name, btn) {
   document.querySelectorAll('.nav-pill').forEach(b => b.classList.remove('active'));
   el('sc-' + name).classList.add('active');
   btn.classList.add('active');
-  const renders = { inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, ia: renderIA, tips: renderTips };
+  const renders = { inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, ia: renderIA, perfil: renderPerfil, tips: renderTips };
   renders[name] && renders[name]();
 }
 
@@ -520,9 +520,8 @@ function saveVenta() {
   const motoId = parseInt(el('vm').value);
   const moto = getMoto(motoId);
   const clienteId = el('vc').value;
-  const clienteNombre = clienteId
-    ? (S.clientes.find(c => c.id == clienteId) || {nombre:'Cliente'}).nombre
-    : 'Cliente';
+  const clienteSeleccionado = S.clientes.find(c => c.id == clienteId);
+  const clienteNombre = clienteSeleccionado ? clienteSeleccionado.nombre : 'Cliente';
   S.ventas.unshift({
     id: S.nextId++, clienteNombre, motoId,
     motoNombre: moto.marca + ' ' + moto.modelo,
@@ -639,38 +638,69 @@ function renderComisiones() {
   }
 
   const mesHoy = meses[meses.length - 1];
-  const maxBar = Math.max(...meses.map(m => m.total), 1);
+  const totalVentas = S.ventas.reduce((a, v) => a + v.precio, 0);
+  const totalComision = totalComisionVentas(S.ventas);
+  const mesVentasTotal = ventasMes(mesActual, anioActual).reduce((a,v) => a+v.precio, 0);
 
-  // Config badge
+  const maxBarVentas = Math.max(...meses.map(m => m.ventas.reduce((a,v)=>a+v.precio,0)), 1);
+  const maxBarCom = Math.max(...meses.map(m => m.total), 1);
+
   const cfgLabel = cfg.tipo === 'porcentaje'
     ? `${cfg.pct}% del precio de venta`
     : `${pesos(cfg.fijo)} fijo por moto`;
 
   let html = `
-  <div style="background:var(--purple);border-radius:14px;padding:16px;margin-bottom:14px;position:relative;overflow:hidden">
-    <div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.06)"></div>
-    <div style="font-size:11px;color:rgba(255,255,255,0.6);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Comision del mes</div>
-    <div style="font-size:32px;font-weight:600;color:#fff;letter-spacing:-1px">${pesos(mesHoy.total)}</div>
-    <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">${mesHoy.cant} venta${mesHoy.cant !== 1 ? 's' : ''} en ${mesHoy.label}</div>
-    <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:11px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.1);padding:4px 10px;border-radius:20px">${cfgLabel}</span>
-      <button onclick="abrirComConfig()" style="font-size:11px;color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 12px;cursor:pointer">Cambiar</button>
+  <!-- TARJETAS RESUMEN -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+    <div style="background:var(--purple);border-radius:14px;padding:14px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-15px;right:-15px;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,0.07)"></div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.6);font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Comision del mes</div>
+      <div style="font-size:22px;font-weight:600;color:#fff;letter-spacing:-0.5px">${pesos(mesHoy.total)}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px">${mesHoy.cant} venta${mesHoy.cant!==1?'s':''}</div>
+    </div>
+    <div style="background:var(--teal);border-radius:14px;padding:14px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-15px;right:-15px;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,0.07)"></div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.6);font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Ventas del mes</div>
+      <div style="font-size:22px;font-weight:600;color:#fff;letter-spacing:-0.5px">${pesos(mesVentasTotal)}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px">${mesHoy.cant} operacion${mesHoy.cant!==1?'es':''}</div>
+    </div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:14px">
+      <div style="font-size:10px;color:var(--gray);font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Total historico ventas</div>
+      <div style="font-size:18px;font-weight:600;color:var(--gray-d)">${pesos(totalVentas)}</div>
+      <div style="font-size:10px;color:var(--gray);margin-top:2px">${S.ventas.length} ventas totales</div>
+    </div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:14px">
+      <div style="font-size:10px;color:var(--gray);font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Comision total</div>
+      <div style="font-size:18px;font-weight:600;color:var(--teal)">${pesos(totalComision)}</div>
+      <div style="font-size:10px;color:var(--gray);margin-top:2px">${cfgLabel}</div>
     </div>
   </div>
 
-  <div class="section-label">Evolucion mensual</div>
-  <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:16px;margin-bottom:14px">
-    <div style="display:flex;align-items:flex-end;gap:8px;height:100px;margin-bottom:8px">
+  <!-- BOTON CONFIG -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button onclick="abrirComConfig()" style="font-size:11px;color:var(--purple);background:var(--purple-l);border:1px solid var(--purple-m);border-radius:20px;padding:6px 14px;cursor:pointer;font-weight:500">Cambiar sistema de comision</button>
+  </div>
+
+  <!-- GRAFICA DOBLE -->
+  <div class="section-label">Evolucion 6 meses</div>
+  <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:14px;margin-bottom:14px">
+    <div style="display:flex;gap:12px;margin-bottom:8px;font-size:10px;color:var(--gray)">
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--purple);display:inline-block"></span>Comision</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--teal-m);display:inline-block"></span>Venta total</span>
+    </div>
+    <div style="display:flex;align-items:flex-end;gap:6px;height:90px;margin-bottom:6px">
       ${meses.map(m => {
-        const h = Math.max(Math.round((m.total / maxBar) * 100), m.total > 0 ? 4 : 2);
+        const ventaTotal = m.ventas.reduce((a,v)=>a+v.precio,0);
+        const hCom = Math.max(Math.round((m.total / maxBarCom) * 80), m.total > 0 ? 4 : 2);
+        const hVenta = Math.max(Math.round((ventaTotal / maxBarVentas) * 80), ventaTotal > 0 ? 4 : 2);
         const isHoy = m.mes === mesActual && m.anio === anioActual;
-        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
-          <div style="font-size:9px;color:var(--gray);text-align:center">${m.total > 0 ? pesos(m.total).replace('$','') : ''}</div>
-          <div style="width:100%;border-radius:4px 4px 0 0;background:${isHoy ? 'var(--purple)' : '#C4BFEE'};height:${h}px;transition:height .3s"></div>
+        return `<div style="flex:1;display:flex;align-items:flex-end;gap:2px;justify-content:center">
+          <div style="flex:1;border-radius:3px 3px 0 0;background:${isHoy?'var(--purple)':'#C4BFEE'};height:${hCom}px"></div>
+          <div style="flex:1;border-radius:3px 3px 0 0;background:${isHoy?'var(--teal-m)':'#9FE1CB'};height:${hVenta}px"></div>
         </div>`;
       }).join('')}
     </div>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:6px">
       ${meses.map(m => {
         const isHoy = m.mes === mesActual && m.anio === anioActual;
         return `<div style="flex:1;text-align:center;font-size:9px;font-weight:${isHoy?'600':'400'};color:${isHoy?'var(--purple)':'var(--gray)'}">${m.label}</div>`;
@@ -678,35 +708,39 @@ function renderComisiones() {
     </div>
   </div>
 
-  <div class="section-label">Detalle por mes</div>`;
+  <!-- HISTORIAL DETALLADO -->
+  <div class="section-label">Historial de ventas</div>`;
 
-  // Mostrar meses de mas reciente a mas viejo
   [...meses].reverse().forEach(m => {
     if (m.cant === 0) return;
+    const ventasMesTotal = m.ventas.reduce((a,v)=>a+v.precio,0);
     html += `<div style="background:var(--white);border-radius:14px;border:1px solid var(--border);margin-bottom:10px;overflow:hidden">
-      <div style="padding:12px 15px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div style="padding:12px 15px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--gray-l)">
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--gray-d);text-transform:capitalize">${new Date(m.anio,m.mes,1).toLocaleDateString('es-AR',{month:'long',year:'numeric'})}</div>
-          <div style="font-size:11px;color:var(--gray)">${m.cant} venta${m.cant!==1?'s':''}</div>
-        </div>
-        <div style="font-size:17px;font-weight:600;color:var(--purple)">${pesos(m.total)}</div>
-      </div>
-      ${m.ventas.map(v => `
-      <div style="padding:10px 15px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-size:12px;font-weight:500;color:var(--gray-d)">${v.clienteNombre}</div>
-          <div style="font-size:11px;color:var(--gray)">${v.motoNombre} · ${fmtDate(v.fecha)}</div>
+          <div style="font-size:11px;color:var(--gray)">${m.cant} venta${m.cant!==1?'s':''} · Total ${pesos(ventasMesTotal)}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:12px;font-weight:600;color:var(--teal)">${pesos(calcComision(v))}</div>
-          <div style="font-size:10px;color:var(--gray)">${pesos(v.precio)}</div>
+          <div style="font-size:11px;color:var(--gray)">Comision</div>
+          <div style="font-size:16px;font-weight:600;color:var(--teal)">${pesos(m.total)}</div>
+        </div>
+      </div>
+      ${m.ventas.map(v => `
+      <div style="padding:11px 15px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500;color:var(--gray-d);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${v.clienteNombre}</div>
+          <div style="font-size:11px;color:var(--gray)">${v.motoNombre}${v.color?' '+v.color:''} · ${fmtDate(v.fecha)} · ${v.pago}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:10px">
+          <div style="font-size:13px;font-weight:600;color:var(--gray-d)">${pesos(v.precio)}</div>
+          <div style="font-size:11px;color:var(--teal);font-weight:500">${pesos(calcComision(v))} com.</div>
         </div>
       </div>`).join('')}
     </div>`;
   });
 
   if (S.ventas.length === 0) {
-    html += `<div class="empty"><div class="empty-icon">$</div><div class="empty-text">Registra tu primera venta para ver las comisiones</div></div>`;
+    html += `<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">Registra tu primera venta para ver el historial</div></div>`;
   }
 
   el('com-content').innerHTML = html;
@@ -1011,6 +1045,31 @@ async function iaCargaRapida() {
 
 function iaAbrirVentaConDatos(datos) {
   try {
+    // Si hay nombre de cliente pero no existe, crearlo automaticamente
+    if (datos.clienteNombre && datos.clienteNombre !== 'Cliente') {
+      const existe = S.clientes.find(c =>
+        c.nombre.toLowerCase().includes(datos.clienteNombre.toLowerCase())
+      );
+      if (!existe) {
+        // Buscar moto para el prospecto
+        const motoId = datos.motoModelo
+          ? (S.motos.find(m => m.modelo.toLowerCase().includes(datos.motoModelo.toLowerCase())) || S.motos[0] || {id:1}).id
+          : (S.motos[0] || {id:1}).id;
+        S.clientes.unshift({
+          id: S.nextId++,
+          nombre: datos.clienteNombre,
+          tel: '',
+          tipo: 'Ya decidido',
+          motoInt: motoId,
+          prioridad: 'alta',
+          notas: 'Cargado via IA — venta registrada',
+          fecha: todayStr()
+        });
+        save();
+        populateSelects();
+      }
+    }
+
     openSheet('sh-venta');
     setTimeout(() => {
       if (datos.precio) el('vpr').value = datos.precio;
@@ -1031,7 +1090,7 @@ function iaAbrirVentaConDatos(datos) {
         );
         if (moto) el('vm').value = moto.id;
       }
-      if (datos.clienteNombre) {
+      if (datos.clienteNombre && datos.clienteNombre !== 'Cliente') {
         const cliente = S.clientes.find(c =>
           c.nombre.toLowerCase().includes(datos.clienteNombre.toLowerCase())
         );
@@ -1045,13 +1104,176 @@ function copiarTexto(txt) {
   navigator.clipboard.writeText(txt).then(() => toast('Copiado!')).catch(() => toast('Selecciona el texto manualmente'));
 }
 
+/* ── PERFIL ───────────────────────────────────────── */
+const PERFIL_KEY = 'ambar_perfil_v1';
+
+function getPerfil() {
+  try {
+    const raw = localStorage.getItem(PERFIL_KEY);
+    return raw ? JSON.parse(raw) : { nombre: '', empresa: '', foto: '', cargo: 'Vendedor/a' };
+  } catch(e) { return { nombre: '', empresa: '', foto: '', cargo: 'Vendedor/a' }; }
+}
+
+function savePerfil(p) {
+  try { localStorage.setItem(PERFIL_KEY, JSON.stringify(p)); } catch(e) {}
+}
+
+function updateHeader() {
+  const p = getPerfil();
+  const nombreEl = document.getElementById('header-name');
+  const empresaEl = document.getElementById('header-empresa');
+  const avatarImg = document.getElementById('header-avatar-img');
+  const avatarIcon = document.getElementById('header-avatar-icon');
+
+  if (nombreEl) nombreEl.textContent = p.nombre || 'Mi nombre';
+  if (empresaEl) {
+    empresaEl.textContent = p.empresa || '';
+    empresaEl.style.display = p.empresa ? 'block' : 'none';
+  }
+  if (avatarImg && avatarIcon) {
+    if (p.foto) {
+      avatarImg.src = p.foto;
+      avatarImg.style.display = 'block';
+      avatarIcon.style.display = 'none';
+    } else {
+      avatarImg.style.display = 'none';
+      avatarIcon.style.display = 'block';
+    }
+  }
+
+  // Update page title
+  if (p.empresa) document.title = p.empresa + ' · Ventas';
+}
+
+function renderPerfil() {
+  const p = getPerfil();
+  const fotoHtml = p.foto
+    ? `<img src="${p.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+    : `<svg width="50" height="50" viewBox="0 0 24 24" fill="var(--gray-m)"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>`;
+
+  el('perfil-content').innerHTML = `
+  <!-- AVATAR GRANDE -->
+  <div style="display:flex;flex-direction:column;align-items:center;padding:24px 0 20px">
+    <div style="width:110px;height:110px;border-radius:50%;border:3px solid var(--purple-m);overflow:hidden;background:var(--gray-l);display:flex;align-items:center;justify-content:center;margin-bottom:12px;cursor:pointer;position:relative" onclick="el('perfil-foto-input').click()">
+      ${fotoHtml}
+      <div style="position:absolute;bottom:0;right:0;background:var(--purple);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid white">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      </div>
+    </div>
+    <input type="file" id="perfil-foto-input" accept="image/*" style="display:none" onchange="handlePerfilFoto(this)">
+    <div style="font-size:11px;color:var(--gray)">Tocar la foto para cambiarla</div>
+  </div>
+
+  <!-- DATOS DEL VENDEDOR -->
+  <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:16px;margin-bottom:12px">
+    <div style="font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px">Datos del vendedor</div>
+    <div class="field"><label>Nombre completo *</label>
+      <input id="perfil-nombre" value="${p.nombre || ''}" placeholder="Tu nombre y apellido">
+    </div>
+    <div class="field"><label>Cargo</label>
+      <select id="perfil-cargo">
+        <option ${p.cargo==='Vendedor/a'?'selected':''}>Vendedor/a</option>
+        <option ${p.cargo==='Asesor/a comercial'?'selected':''}>Asesor/a comercial</option>
+        <option ${p.cargo==='Ejecutivo/a de ventas'?'selected':''}>Ejecutivo/a de ventas</option>
+        <option ${p.cargo==='Gerente de ventas'?'selected':''}>Gerente de ventas</option>
+        <option ${p.cargo==='Otro'?'selected':''}>Otro</option>
+      </select>
+    </div>
+    <div class="field"><label>Telefono / WhatsApp</label>
+      <input id="perfil-tel" value="${p.tel || ''}" placeholder="11 5544 3322" type="tel">
+    </div>
+  </div>
+
+  <!-- DATOS DE LA EMPRESA -->
+  <div style="background:var(--white);border-radius:14px;border:1px solid var(--border);padding:16px;margin-bottom:12px">
+    <div style="font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px">Concesionaria</div>
+    <div class="field"><label>Nombre de la concesionaria</label>
+      <input id="perfil-empresa" value="${p.empresa || ''}" placeholder="Ej: Moto Center SA">
+    </div>
+    <div class="field"><label>Logo de la empresa</label>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+        <div id="logo-preview" style="width:56px;height:56px;border-radius:10px;border:1.5px solid var(--border-m);overflow:hidden;background:var(--gray-l);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0" onclick="el('perfil-logo-input').click()">
+          ${p.logo ? `<img src="${p.logo}" style="width:100%;height:100%;object-fit:contain">` : `<svg width="22" height="22" viewBox="0 0 24 24" fill="var(--gray-m)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`}
+        </div>
+        <div style="flex:1">
+          <input id="perfil-logo-url" value="${p.logo && p.logo.startsWith('http') ? p.logo : ''}" placeholder="URL del logo (https://...)" oninput="handleLogoUrl(this.value)"
+            style="width:100%;font-size:12px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border-m);background:var(--gray-ll);color:var(--gray-d);font-family:var(--font)">
+          <div style="font-size:10px;color:var(--gray);margin-top:4px">O tocá el cuadrado para subir imagen</div>
+        </div>
+      </div>
+      <input type="file" id="perfil-logo-input" accept="image/*" style="display:none" onchange="handleLogoFile(this)">
+    </div>
+  </div>
+
+  <!-- BOTON GUARDAR -->
+  <button class="btn btn-primary" style="width:100%;min-height:50px;font-size:15px;border-radius:12px;margin-bottom:20px" onclick="guardarPerfil()">
+    Guardar perfil
+  </button>`;
+}
+
+function handlePerfilFoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const p = getPerfil();
+    p.foto = e.target.result;
+    savePerfil(p);
+    updateHeader();
+    renderPerfil();
+    toast('Foto actualizada!');
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleLogoFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const logoEl = document.getElementById('logo-preview');
+    if (logoEl) logoEl.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:contain">`;
+    if (el('perfil-logo-url')) el('perfil-logo-url').value = '';
+    window._tempLogo = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleLogoUrl(url) {
+  const logoEl = document.getElementById('logo-preview');
+  if (!logoEl) return;
+  if (url) {
+    logoEl.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.innerHTML='<svg width=22 height=22 viewBox=0 0 24 24 fill=var(--gray-m)><rect x=3 y=3 width=18 height=18 rx=2/></svg>'">`;
+    window._tempLogo = url;
+  } else {
+    logoEl.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="var(--gray-m)"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>`;
+    window._tempLogo = '';
+  }
+}
+
+function guardarPerfil() {
+  const nombre = (el('perfil-nombre') || {}).value || '';
+  if (!nombre.trim()) { toast('Ingresa tu nombre'); return; }
+  const p = {
+    nombre: nombre.trim(),
+    cargo: (el('perfil-cargo') || {}).value || 'Vendedor/a',
+    tel: (el('perfil-tel') || {}).value || '',
+    empresa: (el('perfil-empresa') || {}).value || '',
+    foto: getPerfil().foto || '',
+    logo: window._tempLogo !== undefined ? window._tempLogo : getPerfil().logo || ''
+  };
+  savePerfil(p);
+  updateHeader();
+  toast('Perfil guardado!');
+}
+
 /* ── INIT ────────────────────────────────────────── */
 function renderAll() {
   renderStats();
   const active = document.querySelector('.screen.active');
   if (!active) return;
   const name = active.id.replace('sc-', '');
-  ({ inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, ia: renderIA, tips: renderTips })[name]?.();
+  ({ inicio: renderInicio, seguimiento: () => renderSeg('todos'), prospectos: renderProspectos, stock: renderStock, comisiones: renderComisiones, ia: renderIA, perfil: renderPerfil, tips: renderTips })[name]?.();
 }
 
 function setGreeting() {
@@ -1062,5 +1284,6 @@ function setGreeting() {
 
 S = loadState();
 setGreeting();
+updateHeader();
 renderAll();
 renderTips();
