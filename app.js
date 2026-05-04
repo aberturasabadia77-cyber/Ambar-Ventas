@@ -4,6 +4,44 @@ const KEY = 'ambar_v1';
 const DAY = 86400000;
 const NOW = new Date();
 
+/* ── SUPABASE ─────────────────────────────────────── */
+const SB_URL = 'https://oamqpypvzvdxzytcjvon.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hbXFweXB2enZkeHp5dGNqdm9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDU0MjksImV4cCI6MjA5MzQyMTQyOX0.69Z4bBE9ivIxvWMRAiSkdh4yYT-_kMp9d_nyQntM8j0';
+const EQUIPO = 'MOTOVENTAS';
+
+async function sbGet(tabla, filtros) {
+  let url = SB_URL + '/rest/v1/' + tabla + '?codigo_equipo=eq.' + EQUIPO + '&order=created_at.desc';
+  if (filtros) url += '&' + filtros;
+  const r = await fetch(url, { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } });
+  return r.ok ? r.json() : [];
+}
+
+async function sbInsert(tabla, data) {
+  const r = await fetch(SB_URL + '/rest/v1/' + tabla, {
+    method: 'POST',
+    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+    body: JSON.stringify({ ...data, codigo_equipo: EQUIPO })
+  });
+  return r.ok ? r.json() : null;
+}
+
+async function sbUpdate(tabla, id, data) {
+  const r = await fetch(SB_URL + '/rest/v1/' + tabla + '?id=eq.' + id, {
+    method: 'PATCH',
+    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return r.ok;
+}
+
+async function sbDelete(tabla, id) {
+  const r = await fetch(SB_URL + '/rest/v1/' + tabla + '?id=eq.' + id, {
+    method: 'DELETE',
+    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+  });
+  return r.ok;
+}
+
 /* ── PERFIL (debe ir primero, otros modulos lo usan) ── */
 const PERFIL_KEY = 'ambar_perfil_v1';
 function getPerfil() {
@@ -379,9 +417,11 @@ function renderStock() {
         </div>
         <div class="cdots">${dots}<span class="cdot-label">${colLabel}</span></div>
         ${m.desc ? `<div style="font-size:11px;color:var(--gray);margin-top:6px;line-height:1.5;font-style:italic">"${m.desc}"</div>` : ''}
+        ${renderReservasBadge(m.marca + ' ' + m.modelo)}
         <div style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
           <button class="btn btn-ghost btn-sm" style="flex:1" onclick="event.stopPropagation();adjStock(${m.id},-1)">− Stock</button>
           <button class="btn btn-ghost btn-sm" style="flex:1" onclick="event.stopPropagation();adjStock(${m.id},1)">+ Stock</button>
+          ${!motoReservada(m.marca + ' ' + m.modelo) && m.stock > 0 ? `<button class="btn btn-sm" style="background:var(--amber-l);color:#633806;border-color:var(--amber-m)" onclick="event.stopPropagation();abrirFormReserva('${m.marca} ${m.modelo}')">Reservar</button>` : ''}
           <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();editarMoto(${m.id})">Editar</button>
         </div>
       </div>
@@ -1473,6 +1513,84 @@ async function iaGenerarChecklist() {
     el('ent-checklist').innerHTML = '<div style="background:var(--red-l);border-radius:10px;padding:12px;font-size:12px;color:var(--red-d)">Error: ' + e.message + '</div>';
   }
 }
+
+/* ── RESERVAS ─────────────────────────────────────── */
+let _reservasCache = [];
+
+async function cargarReservas() {
+  try {
+    const data = await sbGet('reservas', 'activa=eq.true&vence_at=gt.' + new Date().toISOString());
+    _reservasCache = data || [];
+  } catch(e) { _reservasCache = []; }
+}
+
+function motoReservada(motoNombre) {
+  return _reservasCache.find(r => r.moto_nombre === motoNombre);
+}
+
+function renderReservasBadge(motoNombre) {
+  const r = motoReservada(motoNombre);
+  if (!r) return '';
+  const yo = miNombre();
+  const esMia = r.vendedor_nombre === yo;
+  const color = esMia ? 'var(--amber)' : 'var(--red)';
+  const txt = esMia ? 'Tu reserva: ' + r.cliente_nombre : 'Reservada por ' + r.vendedor_nombre;
+  return '<div style="background:' + color + '20;border:1px solid ' + color + ';border-radius:8px;padding:6px 10px;font-size:11px;color:' + color + ';font-weight:500;margin-top:6px">' +
+    'Reservada 24hs — ' + txt +
+    (esMia ? ' <button onclick="event.stopPropagation();liberarReservaId(\'' + r.id + '\')" style="margin-left:8px;font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;font-weight:600">Liberar</button>' : '') +
+    '</div>';
+}
+
+async function liberarReservaId(id) {
+  await sbUpdate('reservas', id, { activa: false });
+  await cargarReservas();
+  toast('Reserva liberada');
+  renderStock();
+}
+
+function abrirFormReserva(motoNombre) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end';
+  overlay.innerHTML = '<div style="background:var(--white);border-radius:16px 16px 0 0;padding:20px;width:100%">' +
+    '<div style="font-size:16px;font-weight:600;margin-bottom:16px">Reservar ' + motoNombre + '</div>' +
+    '<div class="field"><label>Nombre del cliente *</label><input id="res-cliente" placeholder="Juan Lopez"></div>' +
+    '<div class="field"><label>Telefono</label><input id="res-tel" placeholder="11 5544 3322" type="tel"></div>' +
+    '<div class="field"><label>Notas</label><input id="res-notas" placeholder="Quiere verla manana, espera el sueldo..."></div>' +
+    '<div style="font-size:11px;color:var(--gray);margin-bottom:14px">La reserva dura 24 horas. Todos los vendedores la van a ver.</div>' +
+    '<div style="display:flex;gap:10px">' +
+    '<button class="btn" style="flex:1" onclick="this.closest(\'[style*=fixed]\').remove()">Cancelar</button>' +
+    '<button class="btn btn-primary" style="flex:1" onclick="confirmarReserva(\'' + motoNombre + '\',this)">Reservar 24hs</button>' +
+    '</div></div>';
+  document.body.appendChild(overlay);
+}
+
+async function confirmarReserva(motoNombre, btn) {
+  const cliente = document.getElementById('res-cliente').value.trim();
+  if (!cliente) { toast('Ingresa el nombre del cliente'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Reservando...';
+  const tel = (document.getElementById('res-tel') || {}).value || '';
+  const notas = (document.getElementById('res-notas') || {}).value || '';
+  const vence = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const result = await sbInsert('reservas', {
+    moto_nombre: motoNombre,
+    vendedor_nombre: miNombre(),
+    cliente_nombre: cliente,
+    cliente_tel: tel,
+    notas: notas,
+    vence_at: vence,
+    activa: true
+  });
+  btn.closest('[style*=fixed]').remove();
+  if (result) {
+    await cargarReservas();
+    toast('Moto reservada por 24 horas!');
+    renderStock();
+  } else {
+    toast('Error al reservar — intenta de nuevo');
+  }
+}
+
 function renderAll() {
   renderStats();
   const active = document.querySelector('.screen.active');
@@ -1490,5 +1608,23 @@ function setGreeting() {
 S = loadState();
 setGreeting();
 updateHeader();
-renderAll();
+cargarReservas().then(() => renderAll());
 renderTips();
+// Verificar reservas vencidas cada 5 minutos
+setInterval(verificarReservasVencidas, 5 * 60 * 1000);
+
+async function verificarReservasVencidas() {
+  try {
+    const vencidas = await sbGet('reservas', 'activa=eq.true&vence_at=lt.' + new Date().toISOString());
+    if (vencidas && vencidas.length > 0) {
+      for (const r of vencidas) {
+        await sbUpdate('reservas', r.id, { activa: false });
+        if (r.vendedor_nombre === miNombre()) {
+          toast('La reserva de ' + r.moto_nombre + ' para ' + r.cliente_nombre + ' vencio');
+        }
+      }
+      await cargarReservas();
+      renderStock();
+    }
+  } catch(e) {}
+}
